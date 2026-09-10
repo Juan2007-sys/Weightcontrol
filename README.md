@@ -10,7 +10,7 @@ Sistema integral de control y seguimiento de peso y hábitos saludables. Este re
 Weightcontrol/
 ├── backend/                  # API REST construida con NestJS
 │   ├── src/                  # Código fuente (módulos, controladores, servicios)
-│   ├── test/                 # Pruebas e2e y configuración de tests
+│   ├── test/                 # Pruebas unitarias y e2e
 │   ├── package.json          # Dependencias y scripts del backend
 │   └── tsconfig.json         # Configuración de TypeScript
 ├── frontend/                 # Aplicación cliente construida con React + Vite
@@ -19,8 +19,8 @@ Weightcontrol/
 │   ├── package.json          # Dependencias y scripts del frontend
 │   └── vite.config.ts        # Configuración de Vite
 ├── .gitignore                # Reglas de exclusión para Git (monorepo)
-├── commit.sh                 # Script bash para commits interactivos
-├── commit.ps1                # Script PowerShell para commits interactivos
+├── commit.ps1                # Script para PowerShell en Windows (Recomendado en Windows)
+├── commit.sh                 # Script para Git Bash / Linux / macOS
 └── README.md                 # Documentación del proyecto
 ```
 
@@ -32,7 +32,7 @@ Weightcontrol/
 | :--- | :--- |
 | **Backend** | [NestJS](https://nestjs.com/) v12, [TypeScript](https://www.typescriptlang.org/), [Vitest](https://vitest.dev/), [Supertest](https://github.com/ladjs/supertest) |
 | **Frontend** | [React](https://react.dev/) v19, [Vite](https://vitejs.dev/) v8, [TypeScript](https://www.typescriptlang.org/) |
-| **Entorno** | [Node.js](https://nodejs.org/) (v18+ recomendado, compatible con Node v22) |
+| **Entorno** | [Node.js](https://nodejs.org/) (v18+ recomendado, testeado en Node v22) |
 
 ---
 
@@ -40,7 +40,7 @@ Weightcontrol/
 
 ### 1. Requisitos Previos
 
-Asegúrate de tener instalados en tu máquina:
+Asegúrate de tener instalados en tu sistema:
 - **Node.js** (versión 18 o superior): `node -v`
 - **npm** (incluido con Node.js): `npm -v`
 - **Git**: `git --version`
@@ -49,10 +49,10 @@ Asegúrate de tener instalados en tu máquina:
 
 ### 2. Clonar el Repositorio
 
-Abre una terminal y ejecuta el siguiente comando:
+Abre tu terminal (PowerShell, Git Bash o CMD) y clona el proyecto:
 
 ```bash
-git clone https://github.com/TU_USUARIO/Weightcontrol.git
+git clone https://github.com/Juan2007-sys/Weightcontrol.git
 cd Weightcontrol
 ```
 
@@ -73,13 +73,13 @@ npm install --legacy-peer-deps
 npm run start:dev
 ```
 
-> 🌐 **URL del Backend**: Por defecto se ejecutará en [http://localhost:3000](http://localhost:3000) (se mostrará en la consola con el logger integrado).
+> 🌐 **URL del Backend**: Por defecto se iniciará en [http://localhost:3000](http://localhost:3000) (se indicará con el logger integrado en la consola).
 
-#### Comandos adicionales del Backend:
+#### Comandos útiles del Backend:
 
 | Comando | Descripción |
 | :--- | :--- |
-| `npm run start:dev` | Inicia el backend con recarga automática al guardar cambios |
+| `npm run start:dev` | Inicia el backend con recarga automática en caliente al guardar cambios |
 | `npm run build` | Compila el proyecto TypeScript a la carpeta `dist/` |
 | `npm run start:prod` | Inicia el servidor compilado en producción |
 | `npm run test` | Ejecuta las pruebas unitarias con Vitest |
@@ -89,7 +89,7 @@ npm run start:dev
 
 ### 4. Configuración y Ejecución del Frontend
 
-El frontend contiene la interfaz de usuario interactiva.
+El frontend contiene la interfaz de usuario interactiva construida con React y Vite.
 
 ```bash
 # 1. Desde la raíz o en una nueva terminal, entrar a frontend
@@ -104,68 +104,67 @@ npm run dev
 
 > 💻 **URL del Frontend**: Por defecto se ejecutará en [http://localhost:5173](http://localhost:5173).
 
-#### Comandos adicionales del Frontend:
+#### Comandos útiles del Frontend:
 
 | Comando | Descripción |
 | :--- | :--- |
-| `npm run dev` | Inicia el servidor de desarrollo local con Hot Module Replacement (HMR) |
-| `npm run build` | Compila el frontend optimizado para producción en `dist/` |
+| `npm run dev` | Inicia el servidor local de desarrollo con recarga instantánea (HMR) |
+| `npm run build` | Compila y optimiza el frontend para producción en `dist/` |
 | `npm run preview` | Previsualiza localmente el build de producción |
-| `npm run lint` | Ejecuta ESLint para validar buenas prácticas de código |
+| `npm run lint` | Ejecuta el linter (ESLint) para verificar la calidad del código |
 
 ---
 
-## ⚡ Automatización de Commits con `commit.sh` y `commit.ps1`
+## ⚡ Asistente de Commits (`commit.ps1` y `commit.sh`)
 
-Para facilitar el flujo de trabajo con Git y estandarizar los mensajes según la convención **Conventional Commits** (`feat`, `fix`, `docs`, `refactor`, etc.), se incluyen scripts interactivos:
+Para que no tengas que escribir comandos largos de Git y para estandarizar los mensajes según la convención **Conventional Commits** (`feat`, `fix`, `docs`, `refactor`, etc.), tienes dos scripts disponibles:
 
-### Opción A: En Git Bash, Linux o macOS (`commit.sh`)
+### 🌟 Opción 1: En PowerShell de Windows (Recomendado para Windows)
 
-```bash
-# Dar permisos de ejecución (solo necesario la primera vez en Linux/macOS):
-chmod +x commit.sh
-
-# Modo Interactivo:
-./commit.sh
-
-# Modo Rápido (pasando el mensaje directamente):
-./commit.sh "feat(backend): agregar modulo de usuarios"
-```
-
-### Opción B: En Windows PowerShell (`commit.ps1`)
+Ejecuta directamente en PowerShell:
 
 ```powershell
-# Modo Interactivo:
+# Modo Asistente Interactivo:
 .\commit.ps1
 
-# Modo Rápido:
-.\commit.ps1 -Message "feat(frontend): crear vista de dashboard"
+# Modo Rápido (pasando el mensaje directamente):
+.\commit.ps1 "feat(backend): agregar modulo de usuarios"
 ```
 
+> 💡 **Nota sobre PowerShell**: Si al ejecutar `.\commit.ps1` PowerShell te dice que la ejecución de scripts está deshabilitada, puedes habilitarla una sola vez en tu sesión con:
+> `Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`
+
+---
+
+### 🐧 Opción 2: En Git Bash, Linux o macOS (`commit.sh`)
+
+Si usas la terminal **Git Bash**:
+
+```bash
+# Modo Asistente Interactivo:
+./commit.sh
+
+# Modo Rápido:
+./commit.sh "feat(frontend): crear pantalla de login"
+```
+
+---
+
 ### ✨ ¿Qué hace el asistente de commits?
-1. Muestra el estado de los archivos modificados (`git status -s`).
-2. Pregunta si deseas agregar todos los cambios (`git add .`).
-3. Te permite seleccionar el tipo de cambio de forma interactiva (`feat`, `fix`, `docs`, etc.).
-4. Solicita el módulo/alcance opcional (ej. `backend`, `frontend`, `auth`).
-5. Genera el commit con el formato estándar: `tipo(alcance): descripción`.
-6. Pregunta si deseas hacer `git push` a tu rama actual de forma automática.
+1. Detecta si hay cambios modificados en el proyecto.
+2. Agrega automáticamente los cambios al área de preparación (`git add .`).
+3. Te muestra un menú interactivo con colores para elegir el tipo de cambio (`feat`, `fix`, `docs`, `refactor`, etc.).
+4. Solicita el módulo/alcance opcional (ej: `backend`, `frontend`, `auth`).
+5. Genera el commit formateado correctamente: `tipo(alcance): descripción`.
+6. Te pregunta si deseas subirlo inmediatamente a GitHub (`git push -u origin main`).
 
 ---
 
 ## 🛡️ Configuración de `.gitignore`
 
-El archivo `.gitignore` en la raíz del proyecto está configurado para evitar subir archivos innecesarios o sensibles:
-- 🚫 `node_modules/` (dependencias descargadas)
+El archivo `.gitignore` en la raíz está configurado para mantener el repositorio limpio:
+- 🚫 `node_modules/` (dependencias)
 - 🚫 `dist/` y `build/` (archivos compilados)
-- 🚫 `*.tsbuildinfo` (caché de compilación incremental de TypeScript)
-- 🚫 Archivos `.env` y credenciales locales
-- 🚫 Archivos temporales del sistema operativo (`.DS_Store`, `Thumbs.db`) y del editor (`.vscode`, `.idea`)
-
----
-
-## 👥 Contribución
-
-1. Crea una nueva rama para tu función: `git checkout -b feature/nueva-funcionalidad`
-2. Realiza tus cambios y usa `./commit.sh` o `.\commit.ps1` para commitear.
-3. Sube tu rama: `git push origin feature/nueva-funcionalidad`
-4. Abre un **Pull Request**.
+- 🚫 `*.tsbuildinfo` (caché incremental de TypeScript)
+- 🚫 Archivos `.env` y credenciales privadas
+- 🚫 Archivos del sistema operativo (`.DS_Store`, `Thumbs.db`, `Desktop.ini`) y del editor (`.vscode`, `.idea`)
