@@ -18,7 +18,7 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# 2. Informacion de usuario y rama (para trabajo en equipo)
+# 2. Informacion de usuario y rama
 $authorName = (git config user.name)
 $authorEmail = (git config user.email)
 $branch = (git branch --show-current)
@@ -30,19 +30,33 @@ if (-not [string]::IsNullOrWhiteSpace($authorName)) {
 Write-Host "🌿 Rama:  $branch" -ForegroundColor DarkCyan
 
 # 3. Mostrar estado actual de archivos
-Write-Host "`n📋 Estado actual de los archivos modificados:" -ForegroundColor Yellow
+Write-Host "`n📋 Estado actual de los archivos:" -ForegroundColor Yellow
 git status -s
 
 $gitStatus = git status --porcelain
 if (-not $gitStatus -or [string]::IsNullOrWhiteSpace("$gitStatus")) {
-    Write-Host "`n✨ No hay cambios pendientes por commitear. ¡Todo limpio!" -ForegroundColor Green
+    Write-Host "✔ Todos tus archivos (backend y frontend) ya están guardados en commits locales." -ForegroundColor Green
+    
+    Write-Host ""
+    $pushExisting = Read-Host " ¿Deseas subir (push) los commits existentes a GitHub ($branch)? [S/n]"
+    if ([string]::IsNullOrWhiteSpace($pushExisting)) { $pushExisting = "S" }
+    
+    if ($pushExisting -match "^[Ss]$") {
+        Write-Host "`nSubiendo cambios a origin/$branch..." -ForegroundColor Yellow
+        git push -u origin "$branch"
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "`n✔ ¡Subida completada con éxito a GitHub! 🚀" -ForegroundColor Green
+        } else {
+            Write-Host "`n⚠ Hubo un detalle al hacer push. Revisa la autenticación con tu cuenta de GitHub." -ForegroundColor Red
+        }
+    }
     Write-Host "==============================================`n" -ForegroundColor Cyan
     exit 0
 }
 
 # 4. Preguntar si desea agregar todos los cambios (git add .)
 Write-Host ""
-$addAll = Read-Host " ¿Deseas agregar todos los archivos (git add .) ? [S/n]"
+$addAll = Read-Host " ¿Deseas agregar todos los archivos nuevos/modificados (git add .) ? [S/n]"
 if ([string]::IsNullOrWhiteSpace($addAll)) { $addAll = "S" }
 
 if ($addAll -match "^[Ss]$") {
@@ -122,7 +136,6 @@ $doPush = Read-Host " ¿Deseas hacer push a GitHub ($branch)? [S/n]"
 if ([string]::IsNullOrWhiteSpace($doPush)) { $doPush = "S" }
 
 if ($doPush -match "^[Ss]$") {
-    # Verificar si existe el remote origin
     $originUrl = git remote get-url origin 2>$null
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($originUrl)) {
         Write-Host "⚠ No tienes un repositorio remoto configurado como 'origin'." -ForegroundColor Yellow
@@ -135,12 +148,9 @@ if ($doPush -match "^[Ss]$") {
     git push -u origin "$branch"
     
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "`n✔ ¡Push completado con éxito a GitHub! 🚀" -ForegroundColor Green
+        Write-Host "`n✔ ¡Subida completada con éxito a GitHub! 🚀" -ForegroundColor Green
     } else {
         Write-Host "`n⚠ No se pudo hacer push automáticamente." -ForegroundColor Red
-        Write-Host "Posibles razones:" -ForegroundColor Yellow
-        Write-Host "  1. Hay cambios remotos que debes descargar primero (ejecuta: git pull --rebase origin $branch)" -ForegroundColor Yellow
-        Write-Host "  2. Debes iniciar sesión con tu cuenta de GitHub con permisos de colaborador." -ForegroundColor Yellow
     }
 }
 
