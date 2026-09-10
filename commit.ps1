@@ -18,7 +18,18 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# 2. Mostrar estado actual
+# 2. Informacion de usuario y rama (para trabajo en equipo)
+$authorName = (git config user.name)
+$authorEmail = (git config user.email)
+$branch = (git branch --show-current)
+if ([string]::IsNullOrWhiteSpace($branch)) { $branch = "main" }
+
+if (-not [string]::IsNullOrWhiteSpace($authorName)) {
+    Write-Host "👤 Autor: $authorName <$authorEmail>" -ForegroundColor DarkGray
+}
+Write-Host "🌿 Rama:  $branch" -ForegroundColor DarkCyan
+
+# 3. Mostrar estado actual de archivos
 Write-Host "`n📋 Estado actual de los archivos modificados:" -ForegroundColor Yellow
 git status -s
 
@@ -29,7 +40,7 @@ if (-not $gitStatus -or [string]::IsNullOrWhiteSpace("$gitStatus")) {
     exit 0
 }
 
-# 3. Preguntar si desea agregar todos los cambios (git add .)
+# 4. Preguntar si desea agregar todos los cambios (git add .)
 Write-Host ""
 $addAll = Read-Host " ¿Deseas agregar todos los archivos (git add .) ? [S/n]"
 if ([string]::IsNullOrWhiteSpace($addAll)) { $addAll = "S" }
@@ -42,7 +53,7 @@ if ($addAll -match "^[Ss]$") {
     exit 0
 }
 
-# 4. Construir el mensaje del commit
+# 5. Construir el mensaje del commit
 if (-not [string]::IsNullOrWhiteSpace($Message)) {
     $commitMsg = $Message
 } else {
@@ -94,7 +105,7 @@ if (-not [string]::IsNullOrWhiteSpace($Message)) {
     }
 }
 
-# 5. Ejecutar commit
+# 6. Ejecutar commit
 Write-Host "`n💬 Mensaje del commit: `"$commitMsg`"" -ForegroundColor Cyan
 git commit -m "$commitMsg"
 
@@ -105,14 +116,20 @@ if ($LASTEXITCODE -eq 0) {
     exit 1
 }
 
-# 6. Preguntar si desea hacer push al repositorio remoto
+# 7. Preguntar si desea hacer push al repositorio remoto de GitHub
 Write-Host ""
-$doPush = Read-Host " ¿Deseas hacer push a GitHub? [S/n]"
+$doPush = Read-Host " ¿Deseas hacer push a GitHub ($branch)? [S/n]"
 if ([string]::IsNullOrWhiteSpace($doPush)) { $doPush = "S" }
 
 if ($doPush -match "^[Ss]$") {
-    $branch = git branch --show-current
-    if ([string]::IsNullOrWhiteSpace($branch)) { $branch = "main" }
+    # Verificar si existe el remote origin
+    $originUrl = git remote get-url origin 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($originUrl)) {
+        Write-Host "⚠ No tienes un repositorio remoto configurado como 'origin'." -ForegroundColor Yellow
+        Write-Host "Configúralo con: git remote add origin https://github.com/Juan2007-sys/Weightcontrol.git" -ForegroundColor Cyan
+        exit 1
+    }
+
     Write-Host "`nSubiendo cambios a origin/$branch..." -ForegroundColor Yellow
     
     git push -u origin "$branch"
@@ -120,7 +137,10 @@ if ($doPush -match "^[Ss]$") {
     if ($LASTEXITCODE -eq 0) {
         Write-Host "`n✔ ¡Push completado con éxito a GitHub! 🚀" -ForegroundColor Green
     } else {
-        Write-Host "`n⚠ Hubo un problema al hacer push. Verifica tu conexión o autenticación de GitHub." -ForegroundColor Red
+        Write-Host "`n⚠ No se pudo hacer push automáticamente." -ForegroundColor Red
+        Write-Host "Posibles razones:" -ForegroundColor Yellow
+        Write-Host "  1. Hay cambios remotos que debes descargar primero (ejecuta: git pull --rebase origin $branch)" -ForegroundColor Yellow
+        Write-Host "  2. Debes iniciar sesión con tu cuenta de GitHub con permisos de colaborador." -ForegroundColor Yellow
     }
 }
 
