@@ -1,4 +1,4 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Script de Commit Rápido e Interactivo para PowerShell (Windows)
 # ==============================================================================
 
@@ -23,8 +23,8 @@ if ($LASTEXITCODE -ne 0) {
 Write-Host "`n📋 Estado actual de los archivos modificados:" -ForegroundColor Yellow
 git status -s
 
-$status = (git status --porcelain).Trim()
-if ([string]::IsNullOrWhiteSpace($status)) {
+$gitStatus = git status --porcelain
+if (-not $gitStatus -or [string]::IsNullOrWhiteSpace("$gitStatus")) {
     Write-Host "`n✨ No hay cambios pendientes por commitear. ¡Todo limpio!" -ForegroundColor Green
     Write-Host "==============================================`n" -ForegroundColor Cyan
     exit 0
@@ -112,7 +112,8 @@ $doPush = Read-Host " ¿Deseas hacer push a GitHub? [S/n]"
 if ([string]::IsNullOrWhiteSpace($doPush)) { $doPush = "S" }
 
 if ($doPush -match "^[Ss]$") {
-    $branch = (git rev-parse --abbrev-ref HEAD).Trim()
+    $branch = git branch --show-current
+    if ([string]::IsNullOrWhiteSpace($branch)) { $branch = "main" }
     Write-Host "`nSubiendo cambios a origin/$branch..." -ForegroundColor Yellow
     
     git push -u origin "$branch"
