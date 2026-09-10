@@ -1,5 +1,5 @@
-# ==============================================================================
-# Script de Commit Rápido e Interactivo para PowerShell (Windows)
+﻿# ==============================================================================
+# Script de Commit Rapido e Interactivo para PowerShell (Windows)
 # ==============================================================================
 
 param(
@@ -7,7 +7,6 @@ param(
     [string]$Message = ""
 )
 
-Clear-Host
 Write-Host "==============================================" -ForegroundColor Cyan
 Write-Host "   🚀 Asistente de Commits - Weightcontrol   " -ForegroundColor Green
 Write-Host "==============================================" -ForegroundColor Cyan
