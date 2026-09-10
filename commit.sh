@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 
 # ==============================================================================
 # Script de Commit Rápido e Interactivo para Weightcontrol
