@@ -1,114 +1,210 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# 🚀 WeightControl - Backend API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+> **API REST y Motor de Validación Metrológica para Instrumentos de Pesaje**  
+> Desarrollado con [NestJS](https://nestjs.com/) v12, [TypeScript](https://www.typescriptlang.org/), [Mongoose / MongoDB](https://mongoosejs.com/) y [Redis](https://redis.io/).
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 📋 Tabla de Contenidos
+1. [Descripción y Propósito](#-descripción-y-propósito)
+2. [Arquitectura y Estructura del Backend](#-arquitectura-y-estructura-del-backend)
+3. [Esquemas y Modelos de Datos (Mongoose)](#-esquemas-y-modelos-de-datos-mongoose)
+4. [Variables de Entorno (`.env`)](#-variables-de-entorno-env)
+5. [Instalación y Ejecución](#-instalación-y-ejecución)
+6. [Pruebas (Testing)](#-pruebas-testing)
+7. [Cómo Levantar las Bases de Datos con Docker](#-cómo-levantar-las-bases-de-datos-con-docker)
+8. [Marco Normativo y Reglas de Negocio](#-marco-normativo-y-reglas-de-negocio)
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+---
 
-## Project setup
+## 📖 Descripción y Propósito
 
-```bash
-$ npm install
+El backend de **WeightControl** gestiona la lógica de negocio, autenticación, control de acceso basado en roles (RBAC), validaciones metrológicas según la norma colombiana **NTC 2031**, control de precintos **SIMEL**, alertas tempranas de vencimiento y registro inmutable de pistas de auditoría conforme a **ISO/IEC 27001**.
+
+---
+
+## 🏗️ Arquitectura y Estructura del Backend
+
+El backend está organizado por capas y módulos desacoplados:
+
+```text
+backend/
+├── src/
+│   ├── database/
+│   │   └── database.module.ts       # Módulo que registra todos los esquemas en Mongoose
+│   ├── schemas/                     # Modelos y esquemas de Mongoose con TypeScript
+│   │   ├── usuario.schema.ts        # Colección: usuarios (RBAC y credenciales)
+│   │   ├── instrumento.schema.ts    # Colección: instrumentos (Básculas, Pesas, Dinamómetros)
+│   │   ├── calibracion.schema.ts    # Colección: calibraciones (Informes y patrones)
+│   │   ├── certificado.schema.ts    # Colección: certificados (Folio único y firma digital)
+│   │   ├── trazabilidad-evento.schema.ts # Colección: trazabilidad_eventos (Audit log inmutable)
+│   │   └── index.ts                 # Exportador centralizado de esquemas y enums
+│   ├── app.controller.ts            # Controlador base
+│   ├── app.service.ts               # Servicio base
+│   ├── app.module.ts                # Módulo raíz (ConfigModule + MongooseModule + DatabaseModule)
+│   └── main.ts                      # Punto de entrada de la aplicación
+├── test/                            # Pruebas e2e y unitarias con Vitest
+├── .env.example                     # Plantilla de variables de entorno
+├── .env                             # Variables de entorno locales (ignorado por Git)
+├── package.json                     # Dependencias y scripts
+└── tsconfig.json                    # Configuración TypeScript
 ```
 
-## Compile and run the project
+---
+
+## 🗄️ Esquemas y Modelos de Datos (Mongoose)
+
+Los esquemas residen en [`src/schemas/`](./src/schemas/) y aplican las especificaciones de [`../CONTEXT.md`](../CONTEXT.md):
+
+### 1. `Usuario` (`usuarios`)
+- **Campos:** `nombre`, `email` (único), `password` (hasheada, oculta en consultas), `rol`, `documentoIdentidad`, `numeroRegistroSIMEL`, `tarjetaProfesional`, `entidad`, `telefono`, `activo`.
+- **Roles (Enum `RolUsuario`):**
+  - `ADMIN`: Control total del sistema y parámetros maestros.
+  - `TECNICO`: Registro de instrumentos, precintos e informes de calibración.
+  - `INSTITUCION_ACREDITACION`: Acreditación metrológica (ONAC / Laboratorios).
+  - `AUDITOR`: Inspección de evidencias y trazabilidad en solo lectura.
+  - `SIC`: Ente de fiscalización nacional (Superintendencia de Industria y Comercio).
+  - `CIUDADANO`: Consulta pública de instrumentos por serial.
+
+### 2. `Instrumento` (`instrumentos`)
+- **Campos:** `serial` (único, indexado), `marca`, `modelo`, `tipo` (`Bascula`, `Pesa`, `Dinamometro`), `categoriaExactitud` (`Clase I`, `Clase II`, `Clase III`, `Clase IIII`), `capacidadMaxima` ($Max > 0$), `unidadMedida` (`kg`, `g`, `t`, `lb`, `N`, `kN`), `divisionEscala` ($d$ o $e$), `numeroDivisionesVerificacion` ($n = Max / e$), `codigoPrecintoSIMEL`, `propietario`, `ubicacionFisica`, `fechaUltimaCalibracion`, `fechaProximaCalibracion`, `estado`.
+- **Estados Metrológicos (Enum `EstadoInstrumento`):**
+  - `Vigente`: Calibración al día.
+  - `Por vencer`: Dentro del umbral de alerta (30 días).
+  - `Vencido`: Fecha actual $\ge$ Próxima calibración (bloquea la emisión de certificados regulares).
+
+### 3. `Calibracion` (`calibraciones`)
+- **Campos:** `instrumento` (ObjectId ref), `tecnico` (ObjectId ref), `laboratorioAcreditado`, `numeroCertificado` (único), `fechaCalibracion`, `fechaProximaCalibracion`, `resultado` (`Conforme`, `No Conforme`), `codigoPrecintoSIMEL`, `patronesUtilizados`, `erroresMaximosPermitidos`, `incertidumbreExpandida`, `observaciones`, `archivoInformeUrl`.
+
+### 4. `Certificado` (`certificados`)
+- **Campos:** `codigoFolio` (UUID / Hash único), `instrumento` (ref), `calibracion` (ref), `emitidoPor` (ref), `tipoCertificado` (`Calibracion`, `Inspeccion`, `ConformidadMetrologica`), `fechaEmision`, `fechaVencimiento`, `codigoQR`, `firmaDigital` (`firmante`, `cargo`, `fechaFirma`, `hashFirma`), `sellosAplicados` (Decorator: ej. `ConFirmaDigital`, `SelloSIMEL`), `estado` (`Valido`, `Anulado`, `Expirado`).
+
+### 5. `TrazabilidadEvento` (`trazabilidad_eventos`)
+- **Propósito:** Registro inmutable de eventos de auditoría (ISO/IEC 27001).
+- **Campos:** `timestamp`, `userId` (ref), `userRole`, `actionType` (`CREATE`, `UPDATE`, `DELETE`, `GENERATE_CERT`, `CALIBRATE`, `STATUS_CHANGE`, `AUTH_LOGIN`, `AUTH_FAILURE`, `INSPECTION`), `entityAffected` (`Instrumento`, `Calibracion`, `Certificado`, `Usuario`, `Configuracion`), `identifier` (serial o folio), `previousState`, `newState`, `ipAddress`, `userAgent`, `descripcion`.
+
+---
+
+## ⚙️ Variables de Entorno (`.env`)
+
+Crea tu archivo `.env` en la carpeta `backend/` a partir de `.env.example`:
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+cp .env.example .env
 ```
 
-## Run tests
+| Variable | Descripción | Valor por Defecto Local |
+| :--- | :--- | :--- |
+| `PORT` | Puerto de escucha de la API | `3000` |
+| `MONGODB_URI` | Cadena de conexión hacia MongoDB (Docker) | `mongodb://admin:adminpassword123@localhost:27018/weightcontrol?authSource=admin` |
+| `MONGODB_DB_NAME` | Nombre de la base de datos | `weightcontrol` |
+| `REDIS_HOST` | Host del servidor Redis | `localhost` |
+| `REDIS_PORT` | Puerto del servidor Redis | `6379` |
+| `JWT_SECRET` | Clave secreta para firma de tokens JWT | *(Clave secreta)* |
+| `JWT_EXPIRES_IN` | Tiempo de expiración de sesión JWT | `24h` |
+
+---
+
+## 📦 Instalación y Ejecución
 
 ```bash
-# unit tests
-$ npm run test
+# 1. Instalar dependencias con compatibilidad de paquetes
+npm install --legacy-peer-deps
 
-# e2e tests
-$ npm run test:e2e
+# 2. Iniciar en modo desarrollo con recarga en vivo (Watch Mode)
+npm run start:dev
 
-# test coverage
-$ npm run test:cov
+# 3. Compilar TypeScript para producción
+npm run build
+
+# 4. Ejecutar la compilación de producción
+npm run start:prod
 ```
 
-## Deployment
+---
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## 🧪 Pruebas (Testing)
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+El proyecto utiliza **Vitest** como motor de pruebas de alta velocidad:
 
 ```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
+# Ejecutar pruebas unitarias
+npm run test
+
+# Ejecutar pruebas en modo observador
+npm run test:watch
+
+# Ejecutar cobertura de código (Coverage)
+npm run test:cov
+
+# Ejecutar pruebas End-to-End
+npm run test:e2e
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+---
 
-## Observability
+## 🐳 Cómo Levantar las Bases de Datos con Docker
 
-In production applications, observability is essential for understanding how your system behaves, detecting issues early, and maintaining reliable performance.
+El proyecto utiliza **Docker Compose** para aprovisionar automáticamente **MongoDB 7.0** y **Redis 7.0**, junto con sus paneles de administración web.
 
-[NestJS Observe](https://observe.nestjs.com) automatically instruments your NestJS application, giving you deep visibility into your system with minimal setup:
+### 1. Iniciar los Servicios de Base de Datos
+Desde la **raíz del proyecto `Weightcontrol/`** (un nivel arriba de `backend/`), ejecuta:
 
-- **Distributed tracing:** Follow requests across services and understand how they flow through your system.
-- **Waterfall analysis:** Visualize request execution and identify slow operations, bottlenecks, and unexpected delays.
-- **Performance analysis:** Analyze application performance in real time and quickly pinpoint areas that need optimization.
-- **Metrics:** Track key application and infrastructure metrics to understand system health and performance trends.
-- **Logging:** Centralize and correlate logs with traces and other telemetry to make debugging easier.
-- **Error tracking:** Detect errors quickly and investigate their root causes with the surrounding context.
-- **SLA monitoring:** Track service-level objectives and identify when your application is approaching or exceeding defined thresholds.
-- **Alarms and alerts:** Set up alerts for critical errors, performance degradation, SLA violations, and other anomalies so your team can react quickly.
+```bash
+docker compose up -d
+```
 
-## Resources
+### 2. Verificar el Estado de los Contenedores
+Para asegurarte de que los contenedores están corriendo y saludables (*healthy*):
 
-Check out a few resources that may come in handy when working with NestJS:
+```bash
+docker compose ps
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Auto-instrument your application with [NestJS Observer](https://observer.nestjs.com). Distributed tracing, metrics, and logging made easy. Error tracking and performance monitoring for your NestJS applications.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### 3. Servicios y Accesos Disponibles
 
-## Support
+| Servicio | Tecnología | URL / Host Local | Credenciales por Defecto |
+| :--- | :--- | :--- | :--- |
+| **MongoDB** | Base de Datos Principal | `localhost:27018` | Usuario: `admin`<br>Password: `adminpassword123`<br>AuthSource: `admin`<br>DB: `weightcontrol` |
+| **Redis** | Caché en Memoria | `localhost:6379` | Sin contraseña por defecto |
+| **Mongo Express** | Panel Web de MongoDB | **[http://localhost:8081](http://localhost:8081)** | Acceso libre en desarrollo |
+| **Redis Commander** | Panel Web de Redis | **[http://localhost:8082](http://localhost:8082)** | Acceso libre en desarrollo |
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+---
 
-## Stay in touch
+### 🧭 Conexión desde MongoDB Compass
+Para conectarte visualmente desde MongoDB Compass:
+1. Abre MongoDB Compass.
+2. Pega el siguiente **Connection String** y haz clic en **Connect**:
+   ```text
+   mongodb://admin:adminpassword123@localhost:27018/weightcontrol?authSource=admin
+   ```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+---
 
-## License
+### 🛠️ Comandos Útiles de Docker
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```bash
+# Ver logs en tiempo real de MongoDB:
+docker compose logs -f mongodb
+
+# Ver logs en tiempo real de Redis:
+docker compose logs -f redis
+
+# Reiniciar los servicios:
+docker compose restart
+
+# Detener los contenedores (los datos persisten en los volúmenes):
+docker compose down
+
+# Detener y eliminar volúmenes (⚠️ borra los datos de prueba):
+docker compose down -v
+```
+
+---
+
+## ⚖️ Marco Normativo y Reglas de Negocio
+
+Para conocer la totalidad de los requerimientos metrológicos, modelos C4 y patrones GoF aplicados al sistema, consulta el documento maestro:
+👉 **[`../CONTEXT.md`](../CONTEXT.md)**.
+

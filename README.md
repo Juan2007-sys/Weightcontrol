@@ -74,12 +74,14 @@ stateDiagram-v2
 ```text
 Weightcontrol/
 ├── CONTEXT.md                # 📌 CONTEXTO MAESTRO (Reglas, C4, SOLID/GoF, Normas, Mongoose)
+├── docker-compose.yml        # 🐳 Orquestación de Contenedores (MongoDB, Redis, GUIs)
 ├── backend/                  # API REST construida con NestJS
 │   ├── src/                  # Módulos, controladores, servicios y lógica de negocio
 │   │   ├── app.controller.ts # Controlador principal
 │   │   ├── app.service.ts    # Servicios principales
 │   │   └── main.ts           # Punto de entrada con Logger de puerto integrado
 │   ├── test/                 # Pruebas unitarias y End-to-End (e2e) con Vitest
+│   ├── .env.example          # Plantilla de variables de entorno y conexión a DB
 │   ├── package.json          # Dependencias y scripts del backend
 │   └── tsconfig.json         # Configuración de TypeScript
 ├── frontend/                 # Aplicación web interactiva con React + Vite
@@ -101,20 +103,40 @@ Weightcontrol/
 | :--- | :--- |
 | **Backend (API)** | [NestJS](https://nestjs.com/) v12, [TypeScript](https://www.typescriptlang.org/), [Vitest](https://vitest.dev/), [Supertest](https://github.com/ladjs/supertest), [RxJS](https://rxjs.dev/) |
 | **Frontend (UI)** | [React](https://react.dev/) v19, [Vite](https://vitejs.dev/) v8, [TypeScript](https://www.typescriptlang.org/), [ESLint](https://eslint.org/) |
-| **Persistencia y Caché** | [MongoDB](https://www.mongodb.com/) (Base de datos documental), [Redis](https://redis.io/) (Caché en memoria para seriales y sesiones) |
+| **Bases de Datos & Caché** | [MongoDB](https://www.mongodb.com/) v7.0 (NoSQL Documental), [Redis](https://redis.io/) v7 (Caché en memoria y sesiones) |
+| **Contenedores & DevOps** | [Docker](https://www.docker.com/), [Docker Compose](https://docs.docker.com/compose/), [Mongo Express](https://github.com/mongo-express/mongo-express), [Redis Commander](https://joeferner.github.io/redis-commander/) |
 | **Seguridad** | JWT (JSON Web Tokens), bcrypt (hashing), RBAC (Control de acceso basado en roles), AES-256 |
 | **Entorno de Ejecución** | [Node.js](https://nodejs.org/) v18+ (Testeado y compatible con Node v22) |
 
 ---
 
+## 📥 Requisitos Previos y Enlaces de Descarga
+
+Si es la primera vez que vas a trabajar en el proyecto, descarga las herramientas desde sus sitios oficiales:
+
+| Herramienta | Versión Recomendada | Enlace Oficial de Descarga | ¿Cómo verificar si ya lo tienes? |
+| :--- | :--- | :--- | :--- |
+| **Docker Desktop** | Última versión | 🔗 [Descargar Docker Desktop](https://www.docker.com/products/docker-desktop/) | `docker --version` y `docker compose version` |
+| **Node.js** (incluye npm) | **v18 o superior** (LTS recomendada) | 🔗 [Descargar Node.js](https://nodejs.org/en/download) | `node -v` y `npm -v` |
+| **Git** | Última versión disponible | 🔗 [Descargar Git para Windows/Mac/Linux](https://git-scm.com/downloads) | `git --version` |
+| **Visual Studio Code** *(Opcional)* | Editor recomendado | 🔗 [Descargar VS Code](https://code.visualstudio.com/Download) | `code -v` |
+
+---
+
 ## 🚀 Guía Paso a Paso para Iniciar el Proyecto
 
-Para levantar el proyecto completo necesitas tener corriendo **dos terminales simultáneas**: una para el Backend y otra para el Frontend.
+Para levantar el entorno completo sigue este flujo:
 
 ```mermaid
-flowchart LR
-    Cliente["🌐 Navegador Web\nhttp://localhost:5173"] --> Frontend["💻 Frontend (React + Vite)\nPuerto 5173"]
-    Frontend --> Backend["🚀 Backend (NestJS API)\nPuerto 3000"]
+flowchart TD
+    Docker["🐳 Docker Compose\n(MongoDB :27018 | Redis :6379)\n(Mongo Express :8081 | Redis Commander :8082)"]
+    Backend["🚀 Backend NestJS\nPuerto 3000"]
+    Frontend["💻 Frontend React + Vite\nPuerto 5173"]
+    Cliente["🌐 Navegador Web\nhttp://localhost:5173"]
+
+    Docker -->|Persistencia & Caché| Backend
+    Backend -->|API REST / JSON| Frontend
+    Frontend -->|UI / Interacción| Cliente
 ```
 
 ---
@@ -130,18 +152,47 @@ cd Weightcontrol
 
 ---
 
-### Paso 2: Configurar y Ejecutar el Backend
+### Paso 2: Iniciar las Bases de Datos con Docker
 
-El backend proporciona la API REST y la lógica del servidor.
+En la raíz del proyecto, levanta los contenedores de MongoDB, Redis y las interfaces de administración visual:
+
+```bash
+docker compose up -d
+```
+
+> 💡 **Servicios disponibles en Docker:**
+> | Servicio | Tipo | URL / Puerto Local | Credenciales por defecto |
+> | :--- | :--- | :--- | :--- |
+> | **MongoDB** | Base de Datos NoSQL | `localhost:27018` | Usuario: `admin` / Password: `adminpassword123` |
+> | **Redis** | Caché en Memoria | `localhost:6379` | Sin contraseña por defecto |
+> | **Mongo Express** | Panel Web MongoDB | **[http://localhost:8081](http://localhost:8081)** | Acceso libre en dev |
+> | **Redis Commander** | Panel Web Redis | **[http://localhost:8082](http://localhost:8082)** | Acceso libre en dev |
+
+Para detener los servicios cuando termines tu jornada de trabajo:
+```bash
+docker compose down
+```
+
+---
+
+### Paso 3: Configurar y Ejecutar el Backend
+
+Abre una terminal y entra a la carpeta `backend`:
 
 ```bash
 # 1. Entrar a la carpeta backend
 cd backend
 
-# 2. Instalar las dependencias
+# 2. Copiar la plantilla de variables de entorno (si no existe tu archivo .env)
+# En PowerShell:
+Copy-Item .env.example .env
+# En Git Bash / Linux / Mac:
+cp .env.example .env
+
+# 3. Instalar las dependencias
 npm install --legacy-peer-deps
 
-# 3. Iniciar el servidor en modo desarrollo
+# 4. Iniciar el servidor en modo desarrollo
 npm run start:dev
 ```
 
@@ -161,7 +212,7 @@ npm run start:dev
 
 ---
 
-### Paso 3: Configurar y Ejecutar el Frontend
+### Paso 4: Configurar y Ejecutar el Frontend
 
 Abre una **segunda terminal** en la raíz del proyecto `Weightcontrol`:
 
