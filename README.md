@@ -1,37 +1,71 @@
-﻿# 🏋️‍♂️ Weightcontrol
+# ⚖️ WeightControl
 
-Sistema integral de control y seguimiento de peso y hábitos saludables. Este repositorio contiene tanto la API del backend (NestJS) como la aplicación cliente frontend (React + Vite).
+> **Plataforma de Gestión de Datos y Validación de Certificación de Instrumentos de Pesaje**  
+> Sistema integral para centralizar, validar, emitir alertas y garantizar la trazabilidad inalterable de instrumentos de pesaje (básculas comerciales, pesas patrón y dinamómetros) bajo el marco de metrología legal en Colombia.
 
 ---
 
 ## 📋 Tabla de Contenidos
-1. [Requisitos Previos y Enlaces de Descarga](#-requisitos-previos-y-enlaces-de-descarga)
-2. [Estructura del Proyecto](#-estructura-del-proyecto)
-3. [Tecnologías Utilizadas](#️-tecnologías-utilizadas)
-4. [Guía Paso a Paso para Iniciar el Proyecto](#-guía-paso-a-paso-para-iniciar-el-proyecto)
+1. [¿Qué es este Proyecto y para qué sirve?](#-qué-es-este-proyecto-y-para-qué-sirve)
+2. [Contexto Maestro para Desarrolladores e IA (`CONTEXT.md`)](#-contexto-maestro-para-desarrolladores-e-ia-contextmd)
+3. [Marco Normativo y Reglas de Negocio](#-marco-normativo-y-reglas-de-negocio)
+4. [Estructura del Proyecto](#-estructura-del-proyecto)
+5. [Tecnologías Utilizadas](#️-tecnologías-utilizadas)
+6. [Requisitos Previos y Enlaces de Descarga](#-requisitos-previos-y-enlaces-de-descarga)
+7. [Guía Paso a Paso para Iniciar el Proyecto](#-guía-paso-a-paso-para-iniciar-el-proyecto)
    - [Paso 1: Clonar el Repositorio](#paso-1-clonar-el-repositorio)
    - [Paso 2: Configurar y Ejecutar el Backend](#paso-2-configurar-y-ejecutar-el-backend)
    - [Paso 3: Configurar y Ejecutar el Frontend](#paso-3-configurar-y-ejecutar-el-frontend)
-5. [Asistente de Commits Automáticos](#-asistente-de-commits-automáticos-commitps1-y-commitsh)
-6. [Guía para el Grupo de Trabajo (Colaboradores)](#-guía-para-el-grupo-de-trabajo-colaboradores)
-7. [Solución de Problemas Frecuentes (FAQ / Troubleshooting)](#-solución-de-problemas-frecuentes-faq--troubleshooting)
+8. [Asistente de Commits Automáticos](#-asistente-de-commits-automáticos-commitps1-y-commitsh)
+9. [Guía para el Grupo de Trabajo (Colaboradores)](#-guía-para-el-grupo-de-trabajo-colaboradores)
+10. [Solución de Problemas Frecuentes (FAQ / Troubleshooting)](#-solución-de-problemas-frecuentes-faq--troubleshooting)
 
 ---
 
-## 📥 Requisitos Previos y Enlaces de Descarga
+## 🎯 ¿Qué es este Proyecto y para qué sirve?
 
-Si es la primera vez que vas a trabajar en el proyecto y no tienes instaladas las herramientas, descárgalas desde sus sitios oficiales:
+**WeightControl** resuelve la problemática de dispersión de información y la falta de sistemas unificados de inspección metrológica legal en Colombia. Proporciona una plataforma digital confiable donde entidades, técnicos, entes de control y ciudadanos pueden verificar y gestionar el estado metrológico de los instrumentos de pesaje.
 
-| Herramienta | Versión Recomendada | Enlace Oficial de Descarga | ¿Cómo verificar si ya lo tienes? |
-| :--- | :--- | :--- | :--- |
-| **Node.js** (incluye npm) | **v18 o superior** (LTS recomendada) | 🔗 [Descargar Node.js](https://nodejs.org/en/download) | `node -v` y `npm -v` |
-| **Git** | Última versión disponible | 🔗 [Descargar Git para Windows/Mac/Linux](https://git-scm.com/downloads) | `git --version` |
-| **Visual Studio Code** *(Opcional)* | Editor recomendado | 🔗 [Descargar VS Code](https://code.visualstudio.com/Download) | `code -v` |
+### 👥 Actores del Sistema
+* 🛠️ **Técnico Certificado:** Registra instrumentos, carga especificaciones técnicas, precintos SIMEL e informes de calibración.
+* 🏛️ **Institución de Acreditación (ONAC / Laboratorios):** Valida y acredita calibraciones, precintos y certificaciones metrológicas.
+* 🔍 **Instituciones Auditoras & SIC (Superintendencia de Industria y Comercio):** Fiscaliza el cumplimiento normativo, consulta pistas de auditoría inmutables e investiga irregularidades.
+* 👤 **Administrador del Sistema:** Administra usuarios, roles, permisos y parámetros maestros (ej. umbrales de alerta).
+* 🌐 **Ciudadano (Consulta Pública):** Consulta libre sin autenticación del estado de vigencia y certificación de un instrumento mediante su número de serie.
 
-> ⚠️ **Importante durante la instalación en Windows**:
-> - Al instalar **Node.js**, asegúrate de dejar marcada la casilla *"Add to PATH"*.
-> - Al instalar **Git**, asegúrate de seleccionar *"Git from the command line and also from 3rd-party software"*.
-> - Al finalizar las instalaciones, **reinicia tu terminal o VS Code** para que reconozca los comandos.
+---
+
+## 📌 Contexto Maestro para Desarrolladores e IA (`CONTEXT.md`)
+
+En la raíz del repositorio se encuentra el archivo **[`CONTEXT.md`](./CONTEXT.md)**, el cual constituye la **fuente única de verdad** (*Single Source of Truth*) técnica y de negocio del sistema.
+
+### ¿Para qué se utiliza `CONTEXT.md`?
+1. **Instrucciones para Asistentes de IA (Claude, ChatGPT, Cursor, Copilot, Antigravity):** Define el rol de Arquitecto de Software Senior y las restricciones técnicas exactas que deben respetarse en cualquier generación de código, diseño de endpoints, modelos o pruebas.
+2. **Modelo C4 del Sistema:** Detalla los niveles de Contexto (actores e interacciones), Contenedores (Frontend React, API Backend Node.js/NestJS, MongoDB, Redis) y Componentes del Backend.
+3. **Reglas de Negocio Estrictas:** Ciclos de vida del instrumento (`Vigente`, `Por vencer`, `Vencido`), validaciones NTC 2031 (relación $Max/e$, precintos SIMEL, coherencia temporal) y auditoría inmutable.
+4. **Patrones de Diseño GoF y Principios SOLID:** Guía obligatoria de arquitectura (Strategy para canales de notificación, Factory Method y Decorator para emisión de certificados digitales, Observer para eventos de estado metrológico, OCP, ISP y LSP).
+5. **Modelos de Datos y Esquemas Mongoose:** Estructura oficial de las entidades (`Instrumentos`, `Usuarios`, `Calibraciones`, `Certificados`, `Trazabilidad_Eventos`).
+
+> 💡 **Recomendación para el equipo:** Cada vez que comiences a desarrollar un nuevo módulo o le pidas a un asistente de IA que escriba código o diseñe funcionalidades para este proyecto, asegúrate de que tome como base [`CONTEXT.md`](./CONTEXT.md).
+
+---
+
+## ⚖️ Marco Normativo y Reglas de Negocio
+
+El proyecto opera bajo la legislación y normas metrológicas colombianas:
+
+* **NTC 2031:** Requisitos técnicos, metrológicos y de exactitud para instrumentos de pesaje de funcionamiento no automático (IPFNA) (*Clase I, Clase II, Clase III, Clase IIII*).
+* **Decreto 1074 de 2015:** Control metrológico, calibraciones periódicas obligatorias, trazabilidad y precintos de seguridad ante la SIC / SIMEL.
+* **ISO/IEC 27001 & Habeas Data:** Protección de datos personales, cifrado en tránsito (HTTPS) y en reposo (AES-256), y registros de auditoría inmutables.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Vigente: Calibración conforme registrada
+    Vigente --> PorVencer: Faltan <= 30 días para calibración
+    PorVencer --> Vencido: Fecha actual >= Fecha próxima calibración
+    Vencido --> Vigente: Nueva calibración conforme cargada
+    note right of Vencido: Bloqueo: No permite emisión de certificados de operación regular
+```
 
 ---
 
@@ -39,12 +73,13 @@ Si es la primera vez que vas a trabajar en el proyecto y no tienes instaladas la
 
 ```text
 Weightcontrol/
+├── CONTEXT.md                # 📌 CONTEXTO MAESTRO (Reglas, C4, SOLID/GoF, Normas, Mongoose)
 ├── backend/                  # API REST construida con NestJS
 │   ├── src/                  # Módulos, controladores, servicios y lógica de negocio
 │   │   ├── app.controller.ts # Controlador principal
 │   │   ├── app.service.ts    # Servicios principales
 │   │   └── main.ts           # Punto de entrada con Logger de puerto integrado
-│   ├── test/                 # Pruebas unitarias y End-to-End (e2e)
+│   ├── test/                 # Pruebas unitarias y End-to-End (e2e) con Vitest
 │   ├── package.json          # Dependencias y scripts del backend
 │   └── tsconfig.json         # Configuración de TypeScript
 ├── frontend/                 # Aplicación web interactiva con React + Vite
@@ -62,10 +97,12 @@ Weightcontrol/
 
 ## 🛠️ Tecnologías Utilizadas
 
-| Módulo | Tecnologías Principales |
+| Capa / Módulo | Tecnologías Principales |
 | :--- | :--- |
 | **Backend (API)** | [NestJS](https://nestjs.com/) v12, [TypeScript](https://www.typescriptlang.org/), [Vitest](https://vitest.dev/), [Supertest](https://github.com/ladjs/supertest), [RxJS](https://rxjs.dev/) |
 | **Frontend (UI)** | [React](https://react.dev/) v19, [Vite](https://vitejs.dev/) v8, [TypeScript](https://www.typescriptlang.org/), [ESLint](https://eslint.org/) |
+| **Persistencia y Caché** | [MongoDB](https://www.mongodb.com/) (Base de datos documental), [Redis](https://redis.io/) (Caché en memoria para seriales y sesiones) |
+| **Seguridad** | JWT (JSON Web Tokens), bcrypt (hashing), RBAC (Control de acceso basado en roles), AES-256 |
 | **Entorno de Ejecución** | [Node.js](https://nodejs.org/) v18+ (Testeado y compatible con Node v22) |
 
 ---
