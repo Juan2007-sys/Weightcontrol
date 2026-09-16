@@ -11,6 +11,8 @@ import {
   CertificadoSchema,
   TrazabilidadEvento,
   TrazabilidadEventoSchema,
+  Alerta,
+  AlertaSchema,
 } from '../schemas/index.js';
 
 @Module({
@@ -21,6 +23,7 @@ import {
       { name: Calibracion.name, schema: CalibracionSchema },
       { name: Certificado.name, schema: CertificadoSchema },
       { name: TrazabilidadEvento.name, schema: TrazabilidadEventoSchema },
+      { name: Alerta.name, schema: AlertaSchema },
     ]),
   ],
   exports: [MongooseModule],

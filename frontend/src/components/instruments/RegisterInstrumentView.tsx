@@ -1,12 +1,20 @@
 import React, { useState } from 'react';
-import { QrCodeIcon, CheckIcon } from '../common/Icons';
+import { QrCodeIcon, CheckIcon, AlertTriangleIcon } from '../common/Icons';
+import { instrumentosService } from '../../services/instrumentos.service';
+import type { CreateInstrumentoPayload } from '../../services/instrumentos.service';
+import confetti from 'canvas-confetti';
+import { toast } from 'sonner';
 
 interface RegisterInstrumentViewProps {
   onBackToAudit: () => void;
+  onRegisteredSuccess?: () => void;
 }
 
-export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({ onBackToAudit }) => {
+export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({ onBackToAudit, onRegisteredSuccess }) => {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   // Datos del formulario
   const [formData, setFormData] = useState({
@@ -527,6 +535,46 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({ 
                   </div>
                 </div>
 
+                {errorMsg && (
+                  <div
+                    style={{
+                      marginTop: '16px',
+                      backgroundColor: 'var(--danger-bg)',
+                      border: '1px solid var(--danger)',
+                      color: '#991B1B',
+                      padding: '10px 14px',
+                      borderRadius: 'var(--radius-card)',
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <AlertTriangleIcon size={16} />
+                    <span>{errorMsg}</span>
+                  </div>
+                )}
+
+                {successMsg && (
+                  <div
+                    style={{
+                      marginTop: '16px',
+                      backgroundColor: 'var(--ok-bg)',
+                      border: '1px solid var(--ok)',
+                      color: '#065F46',
+                      padding: '10px 14px',
+                      borderRadius: 'var(--radius-card)',
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <CheckIcon size={16} />
+                    <span>{successMsg}</span>
+                  </div>
+                )}
+
                 <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'space-between' }}>
                   <button
                     type="button"
@@ -537,14 +585,66 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({ 
                   </button>
                   <button
                     type="button"
+                    disabled={submitting}
                     className="btn-gov-primary"
-                    onClick={() => {
-                      alert(`Instrumento registrado y emitido rótulo metrológico con éxito para ${formData.serial}!`);
-                      onBackToAudit();
+                    onClick={async () => {
+                      setErrorMsg(null);
+                      setSuccessMsg(null);
+                      setSubmitting(true);
+                      try {
+                        const tipoMapeado = formData.tipo.includes('Pesa')
+                          ? 'Pesa'
+                          : formData.tipo.includes('Dinamometro')
+                          ? 'Dinamometro'
+                          : 'Bascula';
+
+                        const payload: CreateInstrumentoPayload = {
+                          serial: formData.serial.trim(),
+                          marca: formData.marca.trim(),
+                          modelo: formData.modelo.trim(),
+                          tipo: tipoMapeado as any,
+                          categoriaExactitud: 'Clase III',
+                          capacidadMaxima: parseFloat(formData.capacidadMax) || 30,
+                          unidadMedida: 'kg',
+                          divisionEscala: parseFloat(formData.divisionEscala) || 5,
+                          codigoPrecintoSIMEL: formData.precintoSIMEL.trim(),
+                          propietario: {
+                            nombreRazonSocial: formData.establecimiento.trim(),
+                            nitRut: formData.nit.trim(),
+                            direccion: formData.direccion.trim(),
+                            ciudad: formData.municipio.trim(),
+                            departamento: formData.departamento.trim(),
+                          },
+                          ubicacionFisica: formData.direccion.trim(),
+                          fechaUltimaCalibracion: new Date(formData.fechaUltimaCalibracion).toISOString(),
+                          fechaProximaCalibracion: new Date(formData.fechaProximaCalibracion).toISOString(),
+                        };
+
+                        await instrumentosService.create(payload);
+                        confetti({
+                          particleCount: 75,
+                          spread: 60,
+                          origin: { y: 0.6 },
+                        });
+                        toast.success(`Instrumento ${formData.serial} radicado exitosamente en el RUMP`);
+                        setSuccessMsg(`¡Instrumento radicado con éxito en el RUMP bajo serial ${formData.serial}!`);
+                        setTimeout(() => {
+                          if (onRegisteredSuccess) {
+                            onRegisteredSuccess();
+                          } else {
+                            onBackToAudit();
+                          }
+                        }, 1600);
+                      } catch (err: any) {
+                        setErrorMsg(err?.message || 'Error al radicar el instrumento en el backend');
+                      } finally {
+                        setSubmitting(false);
+                      }
                     }}
+                    style={{ opacity: submitting ? 0.7 : 1 }}
                   >
                     <CheckIcon size={14} />
-                    <span>Radicar Registro Oficial en RUMP</span>
+                    <span>{submitting ? 'Radicando en Base de Datos...' : 'Radicar Registro Oficial en RUMP'}</span>
                   </button>
                 </div>
               </div>

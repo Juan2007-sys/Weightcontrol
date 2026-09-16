@@ -36,6 +36,7 @@ export class TrazabilidadEvento {
   userRole?: string;
 
   @Prop({
+    type: String,
     required: true,
     enum: Object.values(TipoAccionAuditoria),
     index: true,
@@ -43,6 +44,7 @@ export class TrazabilidadEvento {
   actionType: TipoAccionAuditoria;
 
   @Prop({
+    type: String,
     required: true,
     enum: Object.values(EntidadAfectada),
     index: true,

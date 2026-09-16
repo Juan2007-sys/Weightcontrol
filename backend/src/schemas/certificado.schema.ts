@@ -68,6 +68,7 @@ export class Certificado {
   emitidoPor: Usuario | string;
 
   @Prop({
+    type: String,
     required: true,
     enum: Object.values(TipoCertificado),
     default: TipoCertificado.CONFORMIDAD_METROLOGICA,
@@ -90,6 +91,7 @@ export class Certificado {
   sellosAplicados: string[]; // Ej: ConMarcaAgua, ConFirmaDigital, SelloSIMEL (Patrón Decorator)
 
   @Prop({
+    type: String,
     required: true,
     enum: Object.values(EstadoCertificado),
     default: EstadoCertificado.VALIDO,

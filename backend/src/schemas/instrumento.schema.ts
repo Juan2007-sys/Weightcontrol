@@ -62,6 +62,7 @@ export class Instrumento {
   modelo: string;
 
   @Prop({
+    type: String,
     required: true,
     enum: Object.values(TipoInstrumento),
     index: true,
@@ -69,6 +70,7 @@ export class Instrumento {
   tipo: TipoInstrumento;
 
   @Prop({
+    type: String,
     required: true,
     enum: Object.values(CategoriaExactitud),
   })
@@ -78,6 +80,7 @@ export class Instrumento {
   capacidadMaxima: number; // Max > 0
 
   @Prop({
+    type: String,
     required: true,
     enum: Object.values(UnidadMedida),
     default: UnidadMedida.KG,
@@ -106,6 +109,7 @@ export class Instrumento {
   fechaProximaCalibracion: Date;
 
   @Prop({
+    type: String,
     required: true,
     enum: Object.values(EstadoInstrumento),
     default: EstadoInstrumento.VIGENTE,

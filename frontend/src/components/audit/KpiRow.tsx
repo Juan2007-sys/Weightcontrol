@@ -1,7 +1,45 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ServerIcon, ShieldCheckIcon, AlertTriangleIcon, ShieldAlertIcon } from '../common/Icons';
+import { instrumentosService } from '../../services/instrumentos.service';
+import { alertasService } from '../../services/alertas.service';
 
 export const KpiRow: React.FC = () => {
+  const [stats, setStats] = useState({
+    total: 18420,
+    vigentes: 17020,
+    porVencer: 412,
+    vencidos: 29,
+  });
+
+  useEffect(() => {
+    const loadStats = async () => {
+      try {
+        const [instStats, alertStats] = await Promise.allSettled([
+          instrumentosService.getStats(),
+          alertasService.getStats(),
+        ]);
+
+        if (instStats.status === 'fulfilled' && instStats.value && instStats.value.total > 0) {
+          const val = instStats.value;
+          const criticas = alertStats.status === 'fulfilled' && alertStats.value ? alertStats.value.criticas : val.vencidos;
+          setStats({
+            total: val.total,
+            vigentes: val.vigentes,
+            porVencer: val.porVencer,
+            vencidos: criticas || val.vencidos,
+          });
+        }
+      } catch {
+        // Fallback a valores por defecto
+      }
+    };
+
+    loadStats();
+  }, []);
+
+  const conformityPercentage = stats.total > 0
+    ? ((stats.vigentes / stats.total) * 100).toFixed(1)
+    : '100';
   return (
     <section
       aria-label="Indicadores Clave de Desempeño Metrológico Nacional"
@@ -39,7 +77,7 @@ export const KpiRow: React.FC = () => {
               margin: '12px 0 10px 0',
             }}
           >
-            18.420
+            {stats.total.toLocaleString()}
           </div>
 
           <div
@@ -57,7 +95,7 @@ export const KpiRow: React.FC = () => {
             <ServerIcon size={16} strokeWidth={1.5} style={{ color: 'var(--navy-900)', flexShrink: 0, marginTop: '2px' }} />
             <div>
               <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                99.2% trazabilidad en 32 departamentos
+                {stats.total > 0 ? 'Trazabilidad y censo en tiempo real' : 'Sincronizando con base de datos...'}
               </p>
               <p style={{ fontSize: '11px' }}>
                 Base de datos RUMP sincronizada con INM
@@ -88,7 +126,7 @@ export const KpiRow: React.FC = () => {
               margin: '12px 0 10px 0',
             }}
           >
-            92.4%
+            {conformityPercentage}%
           </div>
 
           <div
@@ -106,7 +144,7 @@ export const KpiRow: React.FC = () => {
             <ShieldCheckIcon size={16} strokeWidth={1.5} style={{ color: 'var(--ok)', flexShrink: 0, marginTop: '2px' }} />
             <div>
               <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                17.020 instrumentos dentro del EMP
+                {stats.vigentes.toLocaleString()} instrumentos conformes
               </p>
               <p style={{ fontSize: '11px' }}>
                 Validaciones conformes bajo NTC 2031
@@ -137,7 +175,7 @@ export const KpiRow: React.FC = () => {
               margin: '12px 0 10px 0',
             }}
           >
-            412
+            {stats.porVencer.toLocaleString()}
           </div>
 
           <div
@@ -158,7 +196,7 @@ export const KpiRow: React.FC = () => {
                 Notificaciones automáticas radicadas
               </p>
               <p style={{ fontSize: '11px' }}>
-                Riesgo inminente de suspensión de pesaje
+                Riesgo de suspensión de pesaje comercial
               </p>
             </div>
           </div>
@@ -186,7 +224,7 @@ export const KpiRow: React.FC = () => {
               margin: '12px 0 10px 0',
             }}
           >
-            29
+            {stats.vencidos.toLocaleString()}
           </div>
 
           <div
@@ -204,7 +242,7 @@ export const KpiRow: React.FC = () => {
             <ShieldAlertIcon size={16} strokeWidth={1.5} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: '2px' }} />
             <div>
               <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                21 precintos SIMEL violados / adulterados
+                Equipos vencidos o precintos violados
               </p>
               <p style={{ fontSize: '11px' }}>
                 Apertura formal de pliego de cargos SIC

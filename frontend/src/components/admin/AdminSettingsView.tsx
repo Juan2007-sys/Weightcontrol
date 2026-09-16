@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
-import { ServerIcon, LockIcon, CheckIcon, ShieldCheckIcon } from '../common/Icons';
+import { CheckIcon, ShieldCheckIcon } from '../common/Icons';
+import { toast } from 'sonner';
 
 export const AdminSettingsView: React.FC = () => {
   const [thresholdDays, setThresholdDays] = useState('30');
   const [periodicityMonths, setPeriodicityMonths] = useState('12');
   const [empToleranceClass, setEmpToleranceClass] = useState('Clase III');
-  const [timeServer, setTimeServer] = useState('time.nist.gov (NIST UTC-5)');
-  const [hsmKey, setHsmKey] = useState('HSM-KEY #9842 (FIPS 140-2 Level 3)');
+  const timeServer = 'time.nist.gov (NIST UTC-5)';
+  const hsmKey = 'HSM-KEY #9842 (FIPS 140-2 Level 3)';
   const [saved, setSaved] = useState(false);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     setSaved(true);
+    toast.success('Parámetros maestros actualizados y replicados en los nodos técnicos.');
     setTimeout(() => setSaved(false), 3000);
   };
 

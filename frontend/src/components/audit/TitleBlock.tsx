@@ -96,7 +96,11 @@ export const TitleBlock: React.FC<TitleBlockProps> = ({ onExportReport, onNewIns
           <button
             type="button"
             className="btn-gov-secondary"
-            onClick={() => onExportReport ? onExportReport('PDF') : alert('Generando Informe Oficial Certificado (.PDF / .CSV) con sellado de tiempo NIST...')}
+            onClick={() => {
+              if (onExportReport) {
+                onExportReport('PDF');
+              }
+            }}
             title="Exportar informe técnico consolidado en formatos PDF y CSV"
           >
             <DownloadIcon size={16} />

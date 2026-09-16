@@ -1,6 +1,6 @@
 import React from 'react';
 import { FilterIcon, RotateCcwIcon, SearchIcon, BalanceIcon } from '../common/Icons';
-import { FilterCriteria } from '../../types/metrology';
+import type { FilterCriteria } from '../../types/metrology';
 
 interface ForensicFiltersProps {
   filters: FilterCriteria;

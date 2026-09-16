@@ -1,18 +1,48 @@
 import React, { useState } from 'react';
-import { LockIcon, ShieldCheckIcon, AlertTriangleIcon, CheckIcon, UserCheckIcon } from '../common/Icons';
+import { LockIcon, ShieldCheckIcon, AlertTriangleIcon, CheckIcon } from '../common/Icons';
+import { useAuth } from '../../context/AuthContext';
 
 interface LoginViewProps {
   onLoginSuccess: () => void;
 }
 
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
+  const { login } = useAuth();
   const [profile, setProfile] = useState('inspector');
-  const [email, setEmail] = useState('m.gomez@sic.gov.co');
-  const [password, setPassword] = useState('••••••••••••••••');
+  const [email, setEmail] = useState('admin@weightcontrol.gov.co');
+  const [password, setPassword] = useState('Admin123456!');
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState<boolean>(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleProfileChange = (newProfile: string) => {
+    setProfile(newProfile);
+    if (newProfile === 'admin') {
+      setEmail('admin@weightcontrol.gov.co');
+      setPassword('Admin123456!');
+    } else if (newProfile === 'tecnico') {
+      setEmail('tecnico@oec-onac.org');
+      setPassword('Tecnico123456!');
+    } else if (newProfile === 'inspector') {
+      setEmail('inspector@sic.gov.co');
+      setPassword('Inspector123456!');
+    } else if (newProfile === 'oec') {
+      setEmail('laboratorio@onac.org.co');
+      setPassword('Laboratorio123456!');
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onLoginSuccess();
+    setError(null);
+    setSubmitting(true);
+    try {
+      await login(email, password);
+      onLoginSuccess();
+    } catch (err: any) {
+      setError(err?.message || 'Error al autenticar con el servidor');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -214,6 +244,25 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
               </div>
 
               <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+                {error && (
+                  <div
+                    style={{
+                      backgroundColor: 'var(--danger-bg)',
+                      border: '1px solid var(--danger)',
+                      color: '#991B1B',
+                      padding: '10px 14px',
+                      borderRadius: 'var(--radius-card)',
+                      fontSize: '13px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <AlertTriangleIcon size={16} />
+                    <span>{error}</span>
+                  </div>
+                )}
+
                 <div>
                   <label htmlFor="auth-profile" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
                     PERFIL INSTITUCIONAL O REGULATORIO
@@ -221,7 +270,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   <select
                     id="auth-profile"
                     value={profile}
-                    onChange={(e) => setProfile(e.target.value)}
+                    onChange={(e) => handleProfileChange(e.target.value)}
                     style={{
                       width: '100%',
                       padding: '10px 12px',
@@ -243,6 +292,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   <input
                     id="auth-email"
                     type="email"
+                    required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     style={{
@@ -257,7 +307,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                     <label htmlFor="auth-password" className="microlabel" style={{ color: 'var(--text-muted)' }}>
-                      CONTRASEÑA TÉCNICA (MÍN. 12 CARACTERES)
+                      CONTRASEÑA TÉCNICA (MÍN. 8 CARACTERES)
                     </label>
                     <span className="microlabel-sm font-mono" style={{ color: 'var(--ok)' }}>
                       NIVEL ALTO
@@ -266,6 +316,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   <input
                     id="auth-password"
                     type="password"
+                    required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     style={{
@@ -280,11 +331,12 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
                 <button
                   type="submit"
+                  disabled={submitting}
                   className="btn-gov-primary"
-                  style={{ width: '100%', height: '42px', marginTop: '8px' }}
+                  style={{ width: '100%', height: '42px', marginTop: '8px', opacity: submitting ? 0.7 : 1 }}
                 >
                   <LockIcon size={16} />
-                  <span>Validar Credencial e Ingresar a SICM-COL</span>
+                  <span>{submitting ? 'Autenticando...' : 'Validar Credencial e Ingresar a SICM-COL'}</span>
                 </button>
               </form>
             </div>

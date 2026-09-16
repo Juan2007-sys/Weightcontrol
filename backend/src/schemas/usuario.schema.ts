@@ -24,6 +24,7 @@ export class Usuario {
   password: string;
 
   @Prop({
+    type: String,
     required: true,
     enum: Object.values(RolUsuario),
     default: RolUsuario.CIUDADANO,

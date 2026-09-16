@@ -1,6 +1,20 @@
 import React from 'react';
 import type { MetrologicalInstrument } from '../../types/metrology';
 import { XIcon, ShieldCheckIcon, AlertTriangleIcon, ShieldAlertIcon, FileTextIcon, LockIcon } from '../common/Icons';
+import { motion } from 'framer-motion';
+import { toast } from 'sonner';
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Line,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ReferenceLine,
+} from 'recharts';
 
 interface InspectionDetailModalProps {
   instrument: MetrologicalInstrument | null;
@@ -16,11 +30,24 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
   const isCritical = instrument.estado === 'CRÍTICA (MEDIDA INMEDIATA)' || instrument.estado === 'SUSPENDIDA (CONTROL CAUTELAR)';
   const isWarning = instrument.estado === 'POR VENCER (<30 DÍAS)' || instrument.estado === 'VENCIDO / NO APTO';
 
+  const chartData = [
+    { carga: '0 kg', error: 0, toleranciaPos: 5, toleranciaNeg: -5 },
+    { carga: '5 kg', error: 2, toleranciaPos: 5, toleranciaNeg: -5 },
+    { carga: '10 kg', error: 6, toleranciaPos: 7.5, toleranciaNeg: -7.5 },
+    { carga: '15 kg', error: isCritical ? 18 : 4, toleranciaPos: 7.5, toleranciaNeg: -7.5 },
+    { carga: '20 kg', error: isCritical ? 24 : 5, toleranciaPos: 10, toleranciaNeg: -10 },
+    { carga: '30 kg', error: isCritical ? 32 : 6, toleranciaPos: 15, toleranciaNeg: -15 },
+  ];
+
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
       style={{
         position: 'fixed',
         top: 0,
@@ -28,7 +55,7 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
         width: '100vw',
         height: '100vh',
         backgroundColor: 'rgba(7, 20, 39, 0.75)',
-        backdropFilter: 'blur(2px)',
+        backdropFilter: 'blur(3px)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -36,18 +63,22 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
         padding: '20px',
       }}
     >
-      <div
+      <motion.div
         className="gov-card"
+        initial={{ scale: 0.94, opacity: 0, y: 16 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.94, opacity: 0, y: 16 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         style={{
           width: '100%',
-          maxWidth: '860px',
-          maxHeight: '90vh',
+          maxWidth: '880px',
+          maxHeight: '92vh',
           backgroundColor: '#FFFFFF',
           borderRadius: 'var(--radius-card)',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1)',
+          boxShadow: '0 25px 35px -5px rgba(0, 0, 0, 0.25), 0 10px 15px -5px rgba(0, 0, 0, 0.1)',
         }}
       >
         {/* Cabecera del Expediente (Navy Institucional) */}
@@ -258,6 +289,26 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
               </span>
             </div>
 
+            {/* Gráfico Recharts de Curva de Calibración vs EMP */}
+            <div style={{ height: '170px', width: '100%', marginTop: '6px', marginBottom: '14px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F1F5F9" />
+                  <XAxis dataKey="carga" stroke="#64748B" fontSize={10} />
+                  <YAxis stroke="#64748B" fontSize={10} unit="g" />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: '#0B1F3F', borderRadius: '4px', border: 'none', color: '#FFFFFF', fontSize: '11px' }}
+                    itemStyle={{ color: '#FFFFFF' }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '2px' }} />
+                  <ReferenceLine y={0} stroke="#94A3B8" strokeWidth={1} />
+                  <Line type="stepAfter" dataKey="toleranciaPos" name="+EMP Límite (g)" stroke="#D97706" strokeDasharray="3 3" strokeWidth={1.5} dot={false} />
+                  <Line type="stepAfter" dataKey="toleranciaNeg" name="-EMP Límite (g)" stroke="#D97706" strokeDasharray="3 3" strokeWidth={1.5} dot={false} />
+                  <Bar dataKey="error" name="Error Medido (g)" fill={isCritical ? '#DC2626' : '#0E9F6E'} radius={[3, 3, 0, 0]} barSize={22} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
               <thead>
                 <tr style={{ backgroundColor: '#F1F5F9', borderBottom: '1px solid var(--border)' }}>
@@ -364,7 +415,7 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
               type="button"
               className="btn-gov-primary"
               onClick={() => {
-                alert(`Generando Acta Oficial Notificada y Copia Auténtica para el titular ${instrument.establecimiento} (NIT ${instrument.nit})...`);
+                toast.success(`Dictamen Oficial (.PDF) emitido y firmado con HSM para ${instrument.establecimiento} (NIT ${instrument.nit})`);
                 onClose();
               }}
             >
@@ -373,7 +424,7 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 };

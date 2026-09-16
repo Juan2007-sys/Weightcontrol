@@ -1,6 +1,7 @@
 import React from 'react';
-import { ActiveScreen } from '../../types/metrology';
+import type { ActiveScreen } from '../../types/metrology';
 import { UserCheckIcon, ShieldCheckIcon } from './Icons';
+import { useAuth } from '../../context/AuthContext';
 
 interface BrandHeaderProps {
   activeScreen: ActiveScreen;
@@ -8,6 +9,7 @@ interface BrandHeaderProps {
 }
 
 export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNavigate }) => {
+  const { user, isAuthenticated, logout } = useAuth();
   return (
     <header
       style={{
@@ -195,61 +197,82 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
         </nav>
 
         {/* Perfil de Usuario con Rol / Acceso a Login */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
-          <button
-            type="button"
-            onClick={() => onNavigate('login')}
-            title="Ver credencial institucional o cerrar sesión"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '10px',
-              padding: '6px 12px',
-              borderRadius: 'var(--radius-card)',
-              border: '1px solid var(--border)',
-              backgroundColor: activeScreen === 'login' ? 'var(--blue-50)' : '#F8FAFC',
-              transition: 'all 0.15s ease',
-              textAlign: 'left',
-            }}
-          >
-            <div
-              style={{
-                width: '32px',
-                height: '32px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--navy-900)',
-                color: '#FFFFFF',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+          {isAuthenticated && user ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '6px 12px',
+                  borderRadius: 'var(--radius-card)',
+                  border: '1px solid var(--border)',
+                  backgroundColor: '#F8FAFC',
+                }}
+              >
+                <div
+                  style={{
+                    width: '32px',
+                    height: '32px',
+                    borderRadius: '50%',
+                    backgroundColor: 'var(--navy-900)',
+                    color: '#FFFFFF',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <UserCheckIcon size={16} />
+                </div>
+                <div>
+                  <div
+                    style={{
+                      fontSize: '12px',
+                      fontWeight: 700,
+                      color: 'var(--navy-900)',
+                      lineHeight: 1.2,
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {user.nombre}
+                  </div>
+                  <div
+                    className="microlabel-sm font-mono"
+                    style={{
+                      fontSize: '9px',
+                      color: 'var(--blue-600)',
+                      marginTop: '1px',
+                    }}
+                  >
+                    ROL: {user.rol} {user.cargo ? `· ${user.cargo}` : ''}
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  onNavigate('login');
+                }}
+                className="btn-gov-compact"
+                style={{ height: '34px', fontSize: '11px', color: '#991B1B', borderColor: 'var(--danger)' }}
+                title="Cerrar sesión y salir del sistema"
+              >
+                Salir
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onNavigate('login')}
+              className="btn-gov-primary"
+              style={{ height: '36px', fontSize: '12px', padding: '0 14px' }}
             >
-              <UserCheckIcon size={16} />
-            </div>
-
-            <div>
-              <div
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 700,
-                  color: 'var(--navy-900)',
-                  lineHeight: 1.2,
-                }}
-              >
-                ING. M. GÓMEZ B.
-              </div>
-              <div
-                className="microlabel-sm font-mono"
-                style={{
-                  fontSize: '9px',
-                  color: 'var(--text-muted)',
-                  marginTop: '1px',
-                }}
-              >
-                AUDITOR FISCALIZADOR III · SIC
-              </div>
-            </div>
-          </button>
+              <UserCheckIcon size={14} />
+              <span>Ingreso Institucional</span>
+            </button>
+          )}
         </div>
       </div>
     </header>

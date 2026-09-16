@@ -1,6 +1,7 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import type { ActiveScreen, FilterCriteria, MetrologicalInstrument } from './types/metrology';
 import { INITIAL_INSTRUMENTS } from './data/mockData';
+import { instrumentosService } from './services/instrumentos.service';
 import { GovBar } from './components/common/GovBar';
 import { BrandHeader } from './components/common/BrandHeader';
 import { TechnicalStatusStrip } from './components/common/TechnicalStatusStrip';
@@ -16,6 +17,8 @@ import { InstrumentsListView } from './components/instruments/InstrumentsListVie
 import { AccreditationView } from './components/accreditation/AccreditationView';
 import { AdminSettingsView } from './components/admin/AdminSettingsView';
 import { LoginView } from './components/auth/LoginView';
+import { Toaster, toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const INITIAL_FILTERS: FilterCriteria = {
   busquedaGeneral: '',
@@ -27,9 +30,24 @@ const INITIAL_FILTERS: FilterCriteria = {
 
 export const App: React.FC = () => {
   const [activeScreen, setActiveScreen] = useState<ActiveScreen>('auditoria');
-  const [instruments] = useState<MetrologicalInstrument[]>(INITIAL_INSTRUMENTS);
+  const [instruments, setInstruments] = useState<MetrologicalInstrument[]>(INITIAL_INSTRUMENTS);
   const [filters, setFilters] = useState<FilterCriteria>(INITIAL_FILTERS);
   const [activeFilterQuery, setActiveFilterQuery] = useState<FilterCriteria>(INITIAL_FILTERS);
+
+  const fetchInstruments = useCallback(async () => {
+    try {
+      const res = await instrumentosService.getAll({ limit: 100 });
+      if (res.items && res.items.length > 0) {
+        setInstruments(res.items);
+      }
+    } catch {
+      // Fallback a mock data si el backend aún no tiene datos o está offline
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchInstruments();
+  }, [fetchInstruments]);
 
   const handleFilterChange = (field: keyof FilterCriteria, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -38,10 +56,12 @@ export const App: React.FC = () => {
   const handleResetFilters = () => {
     setFilters(INITIAL_FILTERS);
     setActiveFilterQuery(INITIAL_FILTERS);
+    toast.info('Filtros forenses restablecidos.');
   };
 
   const handleApplyFilters = () => {
     setActiveFilterQuery({ ...filters });
+    toast.success('Criterios de filtrado metrológico aplicados.');
   };
 
   // Filtrado reactivo de datos según criterios aplicados
@@ -98,6 +118,8 @@ export const App: React.FC = () => {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <Toaster position="top-right" richColors theme="light" />
+
       {/* 1. Barra de Estado Gubernamental (--gov-bar, 28px) */}
       <GovBar />
 
@@ -107,117 +129,139 @@ export const App: React.FC = () => {
       {/* 3. Franja de Contexto Técnico (#F0F3F8, 1px border) */}
       <TechnicalStatusStrip />
 
-      {/* Contenido Principal Modular */}
-      <main style={{ flex: 1 }}>
-        {activeScreen === 'auditoria' && (
-          <>
-            {/* 4. Breadcrumb Institucional con Chips OEC */}
-            <Breadcrumbs
-              moduleName="INSPECCIÓN Y VIGILANCIA"
-              subSection="AUDITORÍA Y FISCALIZACIÓN NACIONAL DE INSTRUMENTOS"
-              oecCode="ONAC-18-LAB-042"
-              scopeExpiration="31/DIC/2026"
-              privilegeLevel="NIVEL L3 · AUDITOR DE VIGILANCIA SIC"
-            />
+      {/* Contenido Principal Modular con Animación */}
+      <main style={{ flex: 1, overflow: 'hidden' }}>
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeScreen}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1.0] }}
+          >
+            {activeScreen === 'auditoria' && (
+              <>
+                {/* 4. Breadcrumb Institucional con Chips OEC */}
+                <Breadcrumbs
+                  moduleName="INSPECCIÓN Y VIGILANCIA"
+                  subSection="AUDITORÍA Y FISCALIZACIÓN NACIONAL DE INSTRUMENTOS"
+                  oecCode="ONAC-18-LAB-042"
+                  scopeExpiration="31/DIC/2026"
+                  privilegeLevel="NIVEL L3 · AUDITOR DE VIGILANCIA SIC"
+                />
 
-            {/* 5. Bloque de Título H1 con Barra de 4px y Enlaces Normativos */}
-            <TitleBlock
-              onExportReport={(format) => {
-                alert(`Generando Informe Forense Oficial (${format}) con trazabilidad NIST UTC-5 y hash SHA-256...`);
-              }}
-              onNewInspection={() => setActiveScreen('registro')}
-            />
+                {/* 5. Bloque de Título H1 con Barra de 4px y Enlaces Normativos */}
+                <TitleBlock
+                  onExportReport={(format) => {
+                    toast.success(`Generando Informe Forense Oficial (${format}) con trazabilidad NIST UTC-5 y hash SHA-256...`);
+                  }}
+                  onNewInspection={() => setActiveScreen('registro')}
+                />
 
-            {/* 6. Fila de 4 Tarjetas KPI con Borde Lateral Semántico */}
-            <KpiRow />
+                {/* 6. Fila de 4 Tarjetas KPI con Borde Lateral Semántico */}
+                <KpiRow />
 
-            {/* 7. Panel de Filtro Forense Multicriterio de Metrología Legal */}
-            <ForensicFilters
-              filters={filters}
-              onFilterChange={handleFilterChange}
-              onReset={handleResetFilters}
-              onApply={handleApplyFilters}
-            />
+                {/* 7. Panel de Filtro Forense Multicriterio de Metrología Legal */}
+                <ForensicFilters
+                  filters={filters}
+                  onFilterChange={handleFilterChange}
+                  onReset={handleResetFilters}
+                  onApply={handleApplyFilters}
+                />
 
-            {/* 8. Tabla de Datos / Vista Cartográfica */}
-            <DataTable instruments={filteredInstruments} />
+                {/* 8. Tabla de Datos / Vista Cartográfica */}
+                <DataTable instruments={filteredInstruments} />
 
-            {/* 9. Banner Legal y Sancionatorio Ley 1480 de 2011 */}
-            <LegalBanner />
-          </>
-        )}
+                {/* 9. Banner Legal y Sancionatorio Ley 1480 de 2011 */}
+                <LegalBanner />
+              </>
+            )}
 
-        {activeScreen === 'registro' && (
-          <>
-            <Breadcrumbs
-              moduleName="MÓDULO TÉCNICO"
-              subSection="REGISTRAR NUEVO INSTRUMENTO METROLÓGICO (RUMP)"
-              oecCode="ONAC-18-LAB-042"
-              scopeExpiration="31/DIC/2026"
-              privilegeLevel="NIVEL L2 · TÉCNICO METRÓLOGO"
-            />
-            <RegisterInstrumentView onBackToAudit={() => setActiveScreen('auditoria')} />
-            <LegalBanner />
-          </>
-        )}
+            {activeScreen === 'registro' && (
+              <>
+                <Breadcrumbs
+                  moduleName="MÓDULO TÉCNICO"
+                  subSection="REGISTRAR NUEVO INSTRUMENTO METROLÓGICO (RUMP)"
+                  oecCode="ONAC-18-LAB-042"
+                  scopeExpiration="31/DIC/2026"
+                  privilegeLevel="NIVEL L2 · TÉCNICO METRÓLOGO"
+                />
+                <RegisterInstrumentView
+                  onBackToAudit={() => setActiveScreen('auditoria')}
+                  onRegisteredSuccess={() => {
+                    fetchInstruments();
+                    toast.success('¡Instrumento metrológico registrado e inscrito en la base nacional!');
+                    setActiveScreen('auditoria');
+                  }}
+                />
+                <LegalBanner />
+              </>
+            )}
 
-        {activeScreen === 'instrumentos' && (
-          <>
-            <Breadcrumbs
-              moduleName="MÓDULO TÉCNICO"
-              subSection="MIS INSTRUMENTOS REGISTRADOS"
-              oecCode="ONAC-18-LAB-042"
-              scopeExpiration="31/DIC/2026"
-              privilegeLevel="NIVEL L2 · TÉCNICO METRÓLOGO"
-            />
-            <InstrumentsListView
-              instruments={instruments}
-              onNewInstrument={() => setActiveScreen('registro')}
-            />
-            <LegalBanner />
-          </>
-        )}
+            {activeScreen === 'instrumentos' && (
+              <>
+                <Breadcrumbs
+                  moduleName="MÓDULO TÉCNICO"
+                  subSection="MIS INSTRUMENTOS REGISTRADOS"
+                  oecCode="ONAC-18-LAB-042"
+                  scopeExpiration="31/DIC/2026"
+                  privilegeLevel="NIVEL L2 · TÉCNICO METRÓLOGO"
+                />
+                <InstrumentsListView
+                  instruments={instruments}
+                  onNewInstrument={() => setActiveScreen('registro')}
+                />
+                <LegalBanner />
+              </>
+            )}
 
-        {activeScreen === 'validaciones' && (
-          <>
-            <Breadcrumbs
-              moduleName="ORGANISMOS ACREDITADOS"
-              subSection="VALIDACIONES PENDIENTES DE ACREDITACIÓN (ACTAS Y ENSAYOS)"
-              oecCode="ONAC-18-LAB-042"
-              scopeExpiration="31/DIC/2026"
-              privilegeLevel="NIVEL L3 · COMISIÓN TÉCNICA ONAC"
-            />
-            <AccreditationView />
-            <LegalBanner />
-          </>
-        )}
+            {activeScreen === 'validaciones' && (
+              <>
+                <Breadcrumbs
+                  moduleName="ORGANISMOS ACREDITADOS"
+                  subSection="VALIDACIONES PENDIENTES DE ACREDITACIÓN (ACTAS Y ENSAYOS)"
+                  oecCode="ONAC-18-LAB-042"
+                  scopeExpiration="31/DIC/2026"
+                  privilegeLevel="NIVEL L3 · COMISIÓN TÉCNICA ONAC"
+                />
+                <AccreditationView />
+                <LegalBanner />
+              </>
+            )}
 
-        {activeScreen === 'administracion' && (
-          <>
-            <Breadcrumbs
-              moduleName="CONSOLA DE MANDO CENTRALIZADA"
-              subSection="ADMINISTRACIÓN DEL SISTEMA Y PARÁMETROS GLOBALES"
-              oecCode="ONAC-18-LAB-042"
-              scopeExpiration="31/DIC/2026"
-              privilegeLevel="NIVEL L4 · ADMINISTRADOR NACIONAL"
-            />
-            <AdminSettingsView />
-            <LegalBanner />
-          </>
-        )}
+            {activeScreen === 'administracion' && (
+              <>
+                <Breadcrumbs
+                  moduleName="CONSOLA DE MANDO CENTRALIZADA"
+                  subSection="ADMINISTRACIÓN DEL SISTEMA Y PARÁMETROS GLOBALES"
+                  oecCode="ONAC-18-LAB-042"
+                  scopeExpiration="31/DIC/2026"
+                  privilegeLevel="NIVEL L4 · ADMINISTRADOR NACIONAL"
+                />
+                <AdminSettingsView />
+                <LegalBanner />
+              </>
+            )}
 
-        {activeScreen === 'login' && (
-          <>
-            <Breadcrumbs
-              moduleName="PORTAL DE ACCESO RESTRINGIDO"
-              subSection="ACCESO INSTITUCIONAL Y TÉCNICO"
-              oecCode="PUNTO SEGURO SICM"
-              scopeExpiration="VIGENTE"
-              privilegeLevel="AUTENTICACIÓN REQUERIDA (SICM-L1)"
-            />
-            <LoginView onLoginSuccess={() => setActiveScreen('auditoria')} />
-          </>
-        )}
+            {activeScreen === 'login' && (
+              <>
+                <Breadcrumbs
+                  moduleName="PORTAL DE ACCESO RESTRINGIDO"
+                  subSection="ACCESO INSTITUCIONAL Y TÉCNICO"
+                  oecCode="PUNTO SEGURO SICM"
+                  scopeExpiration="VIGENTE"
+                  privilegeLevel="AUTENTICACIÓN REQUERIDA (SICM-L1)"
+                />
+                <LoginView
+                  onLoginSuccess={() => {
+                    toast.success('Autenticación institucional exitosa. Bienvenido al SICM.');
+                    setActiveScreen('auditoria');
+                  }}
+                />
+              </>
+            )}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* Pie Institucional del Gobierno de Colombia y SIC */}

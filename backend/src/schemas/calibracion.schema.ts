@@ -70,6 +70,7 @@ export class Calibracion {
   fechaProximaCalibracion: Date;
 
   @Prop({
+    type: String,
     required: true,
     enum: Object.values(ResultadoCalibracion),
   })

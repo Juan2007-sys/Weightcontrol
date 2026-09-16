@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LockIcon, ServerIcon } from './Icons';
+import { LockIcon } from './Icons';
 
 export const TechnicalStatusStrip: React.FC = () => {
   const [currentTimestamp, setCurrentTimestamp] = useState<string>('');

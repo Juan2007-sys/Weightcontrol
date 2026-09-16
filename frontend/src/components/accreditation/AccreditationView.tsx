@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { FileTextIcon, CheckIcon, XIcon, ShieldCheckIcon } from '../common/Icons';
+import React, { useState, useEffect } from 'react';
+import { CheckIcon, XIcon } from '../common/Icons';
+import { calibracionesService } from '../../services/calibraciones.service';
+import { toast } from 'sonner';
 
 interface ValidationItem {
   id: string;
@@ -48,10 +50,40 @@ const INITIAL_VALIDATIONS: ValidationItem[] = [
 export const AccreditationView: React.FC = () => {
   const [items, setItems] = useState<ValidationItem[]>(INITIAL_VALIDATIONS);
 
+  useEffect(() => {
+    const loadCalibraciones = async () => {
+      try {
+        const res = await calibracionesService.getAll();
+        if (res.data && res.data.length > 0) {
+          const mapped: ValidationItem[] = res.data.map((c) => ({
+            id: c.id || c._id || c.numeroCertificado,
+            actaNumero: c.numeroCertificado,
+            oec: c.codigoPrecintoSIMEL || 'ONAC-18-LAB-042',
+            laboratorio: c.laboratorioAcreditado,
+            instrumento: typeof c.instrumento === 'object' && c.instrumento ? `${c.instrumento.marca || ''} ${c.instrumento.modelo || ''}` : `Equipo ${c.instrumento}`,
+            empStatus: c.observaciones || `Dictamen: ${c.resultado} (Incertidumbre: ${c.incertidumbreExpandida || '±0.5e'})`,
+            fechaEnsayo: new Date(c.fechaCalibracion).toLocaleDateString('es-CO'),
+            estado: c.resultado === 'Conforme' ? 'APROBADA' : 'OBSERVADA',
+          }));
+          setItems(mapped);
+        }
+      } catch {
+        // Fallback a iniciales
+      }
+    };
+
+    loadCalibraciones();
+  }, []);
+
   const handleAction = (id: string, newStatus: 'APROBADA' | 'OBSERVADA') => {
     setItems((prev) =>
       prev.map((item) => (item.id === id ? { ...item, estado: newStatus } : item))
     );
+    if (newStatus === 'APROBADA') {
+      toast.success(`Acta ${id} aprobada e inscrita en el registro oficial RUMP.`);
+    } else {
+      toast.warning(`Acta ${id} devuelta con requerimiento técnico.`);
+    }
   };
 
   return (
