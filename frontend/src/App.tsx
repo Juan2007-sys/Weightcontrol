@@ -1,122 +1,229 @@
-import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import './App.css'
+import React, { useState, useMemo } from 'react';
+import type { ActiveScreen, FilterCriteria, MetrologicalInstrument } from './types/metrology';
+import { INITIAL_INSTRUMENTS } from './data/mockData';
+import { GovBar } from './components/common/GovBar';
+import { BrandHeader } from './components/common/BrandHeader';
+import { TechnicalStatusStrip } from './components/common/TechnicalStatusStrip';
+import { Breadcrumbs } from './components/common/Breadcrumbs';
+import { TitleBlock } from './components/audit/TitleBlock';
+import { KpiRow } from './components/audit/KpiRow';
+import { ForensicFilters } from './components/audit/ForensicFilters';
+import { DataTable } from './components/audit/DataTable';
+import { LegalBanner } from './components/common/LegalBanner';
+import { GovFooter } from './components/common/GovFooter';
+import { RegisterInstrumentView } from './components/instruments/RegisterInstrumentView';
+import { InstrumentsListView } from './components/instruments/InstrumentsListView';
+import { AccreditationView } from './components/accreditation/AccreditationView';
+import { AdminSettingsView } from './components/admin/AdminSettingsView';
+import { LoginView } from './components/auth/LoginView';
 
-function App() {
-  const [count, setCount] = useState(0)
+const INITIAL_FILTERS: FilterCriteria = {
+  busquedaGeneral: '',
+  tipoIrregularidad: '',
+  estadoLegal: '',
+  oecAcreditado: '',
+  jurisdiccion: '',
+};
+
+export const App: React.FC = () => {
+  const [activeScreen, setActiveScreen] = useState<ActiveScreen>('auditoria');
+  const [instruments] = useState<MetrologicalInstrument[]>(INITIAL_INSTRUMENTS);
+  const [filters, setFilters] = useState<FilterCriteria>(INITIAL_FILTERS);
+  const [activeFilterQuery, setActiveFilterQuery] = useState<FilterCriteria>(INITIAL_FILTERS);
+
+  const handleFilterChange = (field: keyof FilterCriteria, value: string) => {
+    setFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleResetFilters = () => {
+    setFilters(INITIAL_FILTERS);
+    setActiveFilterQuery(INITIAL_FILTERS);
+  };
+
+  const handleApplyFilters = () => {
+    setActiveFilterQuery({ ...filters });
+  };
+
+  // Filtrado reactivo de datos según criterios aplicados
+  const filteredInstruments = useMemo(() => {
+    return instruments.filter((item) => {
+      // Búsqueda por serial, RUMP o NIT
+      if (activeFilterQuery.busquedaGeneral.trim() !== '') {
+        const query = activeFilterQuery.busquedaGeneral.toLowerCase();
+        const matchesSerial = item.serial.toLowerCase().includes(query);
+        const matchesRump = item.placaRump.toLowerCase().includes(query);
+        const matchesNit = item.nit.toLowerCase().includes(query);
+        const matchesEstablecimiento = item.establecimiento.toLowerCase().includes(query);
+        if (!matchesSerial && !matchesRump && !matchesNit && !matchesEstablecimiento) {
+          return false;
+        }
+      }
+
+      // Filtro por irregularidad
+      if (activeFilterQuery.tipoIrregularidad !== '') {
+        if (activeFilterQuery.tipoIrregularidad === 'conforme' && !item.irregularidad.toLowerCase().includes('conforme')) {
+          return false;
+        }
+        if (activeFilterQuery.tipoIrregularidad === 'emp' && !item.irregularidad.toLowerCase().includes('emp')) {
+          return false;
+        }
+        if (activeFilterQuery.tipoIrregularidad === 'precinto' && !item.irregularidad.toLowerCase().includes('precinto')) {
+          return false;
+        }
+        if (activeFilterQuery.tipoIrregularidad === 'vencido' && !item.irregularidad.toLowerCase().includes('vencid')) {
+          return false;
+        }
+        if (activeFilterQuery.tipoIrregularidad === 'excentricidad' && !item.irregularidad.toLowerCase().includes('excentricidad')) {
+          return false;
+        }
+      }
+
+      // Filtro por estado legal
+      if (activeFilterQuery.estadoLegal !== '') {
+        if (item.estado !== activeFilterQuery.estadoLegal) {
+          return false;
+        }
+      }
+
+      // Filtro por jurisdicción / municipio
+      if (activeFilterQuery.jurisdiccion !== '') {
+        if (!item.municipio.includes(activeFilterQuery.jurisdiccion)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [instruments, activeFilterQuery]);
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+      {/* 1. Barra de Estado Gubernamental (--gov-bar, 28px) */}
+      <GovBar />
 
-      <div className="ticks"></div>
+      {/* 2. Cabecera de Marca Oficial (72px, blanco) */}
+      <BrandHeader activeScreen={activeScreen} onNavigate={setActiveScreen} />
 
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
+      {/* 3. Franja de Contexto Técnico (#F0F3F8, 1px border) */}
+      <TechnicalStatusStrip />
 
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
-}
+      {/* Contenido Principal Modular */}
+      <main style={{ flex: 1 }}>
+        {activeScreen === 'auditoria' && (
+          <>
+            {/* 4. Breadcrumb Institucional con Chips OEC */}
+            <Breadcrumbs
+              moduleName="INSPECCIÓN Y VIGILANCIA"
+              subSection="AUDITORÍA Y FISCALIZACIÓN NACIONAL DE INSTRUMENTOS"
+              oecCode="ONAC-18-LAB-042"
+              scopeExpiration="31/DIC/2026"
+              privilegeLevel="NIVEL L3 · AUDITOR DE VIGILANCIA SIC"
+            />
 
-export default App
+            {/* 5. Bloque de Título H1 con Barra de 4px y Enlaces Normativos */}
+            <TitleBlock
+              onExportReport={(format) => {
+                alert(`Generando Informe Forense Oficial (${format}) con trazabilidad NIST UTC-5 y hash SHA-256...`);
+              }}
+              onNewInspection={() => setActiveScreen('registro')}
+            />
+
+            {/* 6. Fila de 4 Tarjetas KPI con Borde Lateral Semántico */}
+            <KpiRow />
+
+            {/* 7. Panel de Filtro Forense Multicriterio de Metrología Legal */}
+            <ForensicFilters
+              filters={filters}
+              onFilterChange={handleFilterChange}
+              onReset={handleResetFilters}
+              onApply={handleApplyFilters}
+            />
+
+            {/* 8. Tabla de Datos / Vista Cartográfica */}
+            <DataTable instruments={filteredInstruments} />
+
+            {/* 9. Banner Legal y Sancionatorio Ley 1480 de 2011 */}
+            <LegalBanner />
+          </>
+        )}
+
+        {activeScreen === 'registro' && (
+          <>
+            <Breadcrumbs
+              moduleName="MÓDULO TÉCNICO"
+              subSection="REGISTRAR NUEVO INSTRUMENTO METROLÓGICO (RUMP)"
+              oecCode="ONAC-18-LAB-042"
+              scopeExpiration="31/DIC/2026"
+              privilegeLevel="NIVEL L2 · TÉCNICO METRÓLOGO"
+            />
+            <RegisterInstrumentView onBackToAudit={() => setActiveScreen('auditoria')} />
+            <LegalBanner />
+          </>
+        )}
+
+        {activeScreen === 'instrumentos' && (
+          <>
+            <Breadcrumbs
+              moduleName="MÓDULO TÉCNICO"
+              subSection="MIS INSTRUMENTOS REGISTRADOS"
+              oecCode="ONAC-18-LAB-042"
+              scopeExpiration="31/DIC/2026"
+              privilegeLevel="NIVEL L2 · TÉCNICO METRÓLOGO"
+            />
+            <InstrumentsListView
+              instruments={instruments}
+              onNewInstrument={() => setActiveScreen('registro')}
+            />
+            <LegalBanner />
+          </>
+        )}
+
+        {activeScreen === 'validaciones' && (
+          <>
+            <Breadcrumbs
+              moduleName="ORGANISMOS ACREDITADOS"
+              subSection="VALIDACIONES PENDIENTES DE ACREDITACIÓN (ACTAS Y ENSAYOS)"
+              oecCode="ONAC-18-LAB-042"
+              scopeExpiration="31/DIC/2026"
+              privilegeLevel="NIVEL L3 · COMISIÓN TÉCNICA ONAC"
+            />
+            <AccreditationView />
+            <LegalBanner />
+          </>
+        )}
+
+        {activeScreen === 'administracion' && (
+          <>
+            <Breadcrumbs
+              moduleName="CONSOLA DE MANDO CENTRALIZADA"
+              subSection="ADMINISTRACIÓN DEL SISTEMA Y PARÁMETROS GLOBALES"
+              oecCode="ONAC-18-LAB-042"
+              scopeExpiration="31/DIC/2026"
+              privilegeLevel="NIVEL L4 · ADMINISTRADOR NACIONAL"
+            />
+            <AdminSettingsView />
+            <LegalBanner />
+          </>
+        )}
+
+        {activeScreen === 'login' && (
+          <>
+            <Breadcrumbs
+              moduleName="PORTAL DE ACCESO RESTRINGIDO"
+              subSection="ACCESO INSTITUCIONAL Y TÉCNICO"
+              oecCode="PUNTO SEGURO SICM"
+              scopeExpiration="VIGENTE"
+              privilegeLevel="AUTENTICACIÓN REQUERIDA (SICM-L1)"
+            />
+            <LoginView onLoginSuccess={() => setActiveScreen('auditoria')} />
+          </>
+        )}
+      </main>
+
+      {/* Pie Institucional del Gobierno de Colombia y SIC */}
+      <GovFooter />
+    </div>
+  );
+};
+
+export default App;
