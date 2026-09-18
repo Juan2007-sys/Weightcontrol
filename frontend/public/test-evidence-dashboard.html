@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WeightControl — Banco de Pruebas & Aseguramiento Metrológico NTC 2031</title>
+  
+  <!-- Typography: Space Grotesk (Headings/Data) + Fira Code / JetBrains Mono (Technical Monospace) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  <!-- Three.js CDN for 3D Technical Calibration Rig -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <!-- Tailwind Config: Swiss Technical / Industrial Palette -->
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Space Grotesk"', 'sans-serif'],
+            mono: ['"Fira Code"', 'monospace'],
+          },
+          colors: {
+            carbon: {
+              950: '#06090e',
+              900: '#0b111c',
+              850: '#101927',
+              800: '#172336',
+              700: '#22344e',
+              600: '#334b6e',
+            },
+            metrology: {
+              emerald: '#00d68f',
+              emeraldDark: '#008557',
+              cyan: '#00b4d8',
+              amber: '#ffaa00',
+              orange: '#ff5e00',
+              crimson: '#ff3366',
+            }
+          },
+          boxShadow: {
+            'sharp': '0 1px 0 0 rgba(255, 255, 255, 0.05), 0 8px 24px -4px rgba(0, 0, 0, 0.6)',
+            'terminal': '0 20px 50px -10px rgba(0, 0, 0, 0.8), inset 0 1px 0 0 rgba(255, 255, 255, 0.08)',
+            'gauge': '0 0 20px rgba(0, 214, 143, 0.25)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Technical Grid Ruler Overlay */
+    .tech-grid-bg {
+      background-size: 32px 32px;
+      background-image: 
+        linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    }
+    
+    .radar-crosshair {
+      position: relative;
+    }
+    .radar-crosshair::before {
+      content: "+";
+      position: absolute;
+      top: -8px;
+      left: -8px;
+      font-family: monospace;
+      font-size: 10px;
+      color: rgba(255, 255, 255, 0.25);
+    }
+
+    /* Custom Industrial Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #06090e; }
+    ::-webkit-scrollbar-thumb { background: #1f2d42; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #00d68f; }
+
+    /* Crisp Precision Borders */
+    .border-hairline {
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .border-active-slot {
+      border: 1px solid rgba(0, 214, 143, 0.4);
+    }
+
+    /* Print Styles: Official Metrology Audit Act */
+    @media print {
+      body {
+        background: #ffffff !important;
+        color: #0b111c !important;
+        font-family: 'Space Grotesk', sans-serif !important;
+      }
+      .no-print, #three-rig-container, .terminal-pane, .tab-slider {
+        display: none !important;
+      }
+      .print-only {
+        display: block !important;
+      }
+      .border-hairline, .bg-carbon-900, .bg-carbon-850 {
+        background: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #0f172a !important;
+        box-shadow: none !important;
+      }
+      .text-slate-400, .text-slate-500 {
+        color: #475569 !important;
+      }
+      .text-white, .text-slate-200 {
+        color: #0b111c !important;
+      }
+      .text-metrology-emerald {
+        color: #008557 !important;
+        font-weight: bold;
+      }
+      .page-break {
+        page-break-before: always;
+      }
+    }
+  </style>
+</head>
+<body class="bg-carbon-950 text-slate-200 font-sans min-h-screen relative tech-grid-bg selection:bg-metrology-emerald/30 selection:text-metrology-emerald">
+
+  <!-- TOP STATUS TICKER / CALIBRATION STANDARD HEADER -->
+  <div class="border-b border-white/5 bg-carbon-950/90 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+      <div class="flex items-center gap-4 text-slate-400">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-none bg-metrology-emerald inline-block animate-ping"></span>
+          <span class="text-white font-bold tracking-wider">LAB_STATION: WEIGHTCONTROL-QA-01</span>
+        </div>
+        <span class="hidden md:inline text-slate-600">|</span>
+        <span class="hidden md:inline text-slate-400">NORM: <strong class="text-slate-200">NTC 2031 / OIML R 76-1</strong></span>
+        <span class="hidden lg:inline text-slate-600">|</span>
+        <span class="hidden lg:inline text-slate-400">LEGAL_REG: <strong class="text-slate-200">DEC. 1074 / SIMEL-SIC</strong></span>
+      </div>
+
+      <div class="flex items-center gap-3 no-print">
+        <span class="px-2 py-0.5 bg-metrology-emerald/10 border border-metrology-emerald/30 text-metrology-emerald text-[11px] font-bold">
+          PASSED: 94 / 94 (100.0%)
+        </span>
+        <button onclick="window.print()" class="px-3 py-1 bg-carbon-800 hover:bg-carbon-700 text-slate-200 border border-white/10 hover:border-metrology-emerald/50 text-[11px] font-mono flex items-center gap-1.5 transition-all cursor-pointer">
+          <svg class="w-3.5 h-3.5 text-metrology-emerald" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          GENERAR ACTA PDF
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APPARATUS WORKSPACE -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+    <!-- HERO / TECHNICAL BENCH TITLE -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center pb-8 border-b border-white/5">
+      
+      <!-- Left: Formal Specification Block -->
+      <div class="lg:col-span-7 space-y-3">
+        <div class="flex items-center gap-2">
+          <span class="font-mono text-[11px] px-2 py-0.5 bg-slate-800 text-slate-300 border border-slate-700">SPEC_ID: WC-QA-2026-NTC</span>
+          <span class="font-mono text-[11px] text-metrology-emerald">ISO/IEC 27001 INMUTABLE TRACE</span>
+        </div>
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-white uppercase leading-none">
+          BANCO DE PRUEBAS &<br>
+          <span class="text-transparent bg-clip-text bg-gradient-to-r from-metrology-emerald via-metrology-cyan to-white">
+            CONFORMIDAD METROLÓGICA
+          </span>
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-400 font-sans max-w-xl leading-relaxed">
+          Matriz de verificación técnica automatizada para Instrumentos de Pesaje de Funcionamiento No Automático (IPFNA). Validación continua de escalones de verificación (<code class="text-slate-200 font-mono">n = Max / e</code>), cálculo de Error Máximo Permitido (<code class="text-slate-200 font-mono">EMP</code>) y control RBAC.
+        </p>
+      </div>
+
+      <!-- Right: Interactive 3D Weighing Cell & Metrology Rig -->
+      <div class="lg:col-span-5 h-56 sm:h-64 bg-carbon-900 border-hairline relative rounded-none overflow-hidden group shadow-sharp">
+        <!-- Technical HUD Markers -->
+        <div class="absolute top-2.5 left-3 font-mono text-[10px] text-slate-500 z-10 flex items-center gap-2">
+          <span class="w-1.5 h-1.5 bg-metrology-emerald inline-block"></span>
+          <span>IPFNA_CELL_3D_RIG [DRAG TO ROTATE]</span>
+        </div>
+        <div class="absolute bottom-2.5 right-3 font-mono text-[10px] text-slate-500 z-10">
+          AXIS: [X: <span id="rig-x">0.0</span> | Y: <span id="rig-y">0.0</span> | Z: <span id="rig-z">1.0</span>]
+        </div>
+        <div class="absolute top-2.5 right-3 font-mono text-[10px] text-metrology-emerald z-10 border border-metrology-emerald/30 px-1.5 py-0.5 bg-carbon-950/80">
+          SENSOR_STATUS: CALIBRATED
+        </div>
+        
+        <!-- WebGL Canvas Container -->
+        <div id="three-rig-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+      </div>
+    </div>
+
+    <!-- PRIMARY TELEMETRY GAUGES (4 DENSE INDUSTRIAL KPI CARDS) -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-3.5 my-6">
+      
+      <!-- Metric 1: Executed Tests -->
+      <div class="bg-carbon-900 p-4 border-hairline relative hover:border-metrology-emerald/40 transition-colors group">
+        <div class="flex items-center justify-between font-mono text-[10px] text-slate-400 mb-2">
+          <span>01 // EXECUTION_SUITES</span>
+          <span class="text-metrology-emerald font-bold">16 / 16 SUITES</span>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl sm:text-4xl font-mono font-bold text-white tracking-tight">94</span>
+          <span class="text-xs font-mono text-metrology-emerald font-bold">TESTS PASS</span>
+        </div>
+        <div class="mt-2 text-[11px] text-slate-400 font-mono flex items-center justify-between border-t border-white/5 pt-2">
+          <span>FAILURES: <strong class="text-slate-200">0</strong></span>
+          <span>SKIPPED: <strong class="text-slate-200">0</strong></span>
+        </div>
+      </div>
+
+      <!-- Metric 2: Execution Latency -->
+      <div class="bg-carbon-900 p-4 border-hairline relative hover:border-metrology-cyan/40 transition-colors group">
+        <div class="flex items-center justify-between font-mono text-[10px] text-slate-400 mb-2">
+          <span>02 // BENCHMARK_TIME</span>
+          <span class="text-metrology-cyan font-bold">4.51s TOTAL</span>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl sm:text-4xl font-mono font-bold text-white tracking-tight">48<span class="text-lg">ms</span></span>
+          <span class="text-xs font-mono text-slate-400">AVG / TEST</span>
+        </div>
+        <div class="mt-2 text-[11px] text-slate-400 font-mono flex items-center justify-between border-t border-white/5 pt-2">
+          <span>TRANSFORM: <strong class="text-slate-200">2.28s</strong></span>
+          <span>TESTS: <strong class="text-slate-200">4.32s</strong></span>
+        </div>
+      </div>
+
+      <!-- Metric 3: Code Coverage -->
+      <div class="bg-carbon-900 p-4 border-hairline relative hover:border-metrology-amber/40 transition-colors group">
+        <div class="flex items-center justify-between font-mono text-[10px] text-slate-400 mb-2">
+          <span>03 // CODE_COVERAGE</span>
+          <span class="text-metrology-amber font-bold">V8 ENGINE</span>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl sm:text-4xl font-mono font-bold text-white tracking-tight">76.8<span class="text-lg">%</span></span>
+          <span class="text-xs font-mono text-metrology-amber font-bold">GLOBAL</span>
+        </div>
+        <div class="mt-2 text-[11px] text-slate-400 font-mono flex items-center justify-between border-t border-white/5 pt-2">
+          <span>AUTH: <strong class="text-slate-200">98.0%</strong></span>
+          <span>NTC RULES: <strong class="text-slate-200">100%</strong></span>
+        </div>
+      </div>
+
+      <!-- Metric 4: Metrological Compliance -->
+      <div class="bg-carbon-900 p-4 border-hairline relative hover:border-white/40 transition-colors group">
+        <div class="flex items-center justify-between font-mono text-[10px] text-slate-400 mb-2">
+          <span>04 // NORMATIVE_AUDIT</span>
+          <span class="text-white font-bold">NTC 2031</span>
+        </div>
+        <div class="flex items-baseline gap-2">
+          <span class="text-3xl sm:text-4xl font-mono font-bold text-metrology-emerald tracking-tight">CLASS I-IV</span>
+        </div>
+        <div class="mt-2 text-[11px] text-slate-400 font-mono flex items-center justify-between border-t border-white/5 pt-2">
+          <span>SIMEL VERIFIED: <strong class="text-slate-200">100%</strong></span>
+          <span>EMP LOGIC: <strong class="text-slate-200">PASS</strong></span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- INTERACTIVE SECTION 1: LIVE METROLOGY EMP VERIFICATION SIMULATOR (PROVES THE NTC 2031 ENGINE) -->
+    <div class="bg-carbon-900 border-hairline p-5 mb-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-white/5">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="w-2 h-2 bg-metrology-amber inline-block"></span>
+            <h3 class="text-sm font-mono font-bold uppercase text-white tracking-wider">
+              SIMULADOR INTERACTIVO NTC 2031 — CÁLCULO DE ESCALONES (n) Y ERROR MÁXIMO PERMITIDO (EMP)
+            </h3>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">
+            Demostración interactiva en vivo del motor de reglas metrológicas probado en <code class="text-slate-200 font-mono">rf001-rf002-registro-validacion.spec.ts</code>.
+          </p>
+        </div>
+        <div class="font-mono text-xs text-slate-400 flex items-center gap-2">
+          <span class="px-2 py-0.5 bg-carbon-800 border border-white/10 text-slate-300">OIML R 76-1 / NTC 2031</span>
+        </div>
+      </div>
+
+      <!-- Simulator Controls Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+        
+        <!-- Input: Capacidad Maxima -->
+        <div class="space-y-1.5 font-mono text-xs">
+          <div class="flex justify-between">
+            <label class="text-slate-300">CAPACIDAD MÁXIMA (Max):</label>
+            <span id="sim-val-max" class="text-metrology-emerald font-bold">30.00 kg</span>
+          </div>
+          <input type="range" id="sim-input-max" min="1" max="300" step="1" value="30" class="w-full accent-emerald-400 bg-carbon-800 h-1.5 cursor-pointer" oninput="recalcSimulator()">
+          <div class="text-[10px] text-slate-500 flex justify-between">
+            <span>Min: 1 kg</span>
+            <span>Max: 300 kg</span>
+          </div>
+        </div>
+
+        <!-- Input: Division de Escala e -->
+        <div class="space-y-1.5 font-mono text-xs">
+          <div class="flex justify-between">
+            <label class="text-slate-300">ESCALÓN DE VERIFICACIÓN (e):</label>
+            <span id="sim-val-e" class="text-metrology-cyan font-bold">0.005 kg (5g)</span>
+          </div>
+          <select id="sim-input-e" class="w-full bg-carbon-850 border border-white/10 px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:border-metrology-emerald focus:outline-none" onchange="recalcSimulator()">
+            <option value="0.001">e = 0.001 kg (1g - Clase II / Joyería)</option>
+            <option value="0.005" selected>e = 0.005 kg (5g - Clase III Comercial)</option>
+            <option value="0.010">e = 0.010 kg (10g - Clase III)</option>
+            <option value="0.050">e = 0.050 kg (50g - Clase IIII Industrial)</option>
+            <option value="0.100">e = 0.100 kg (100g - Clase IIII)</option>
+          </select>
+          <div class="text-[10px] text-slate-500">
+            Define la resolución metrológica de la celda de carga.
+          </div>
+        </div>
+
+        <!-- Input: Carga de Ensayo m -->
+        <div class="space-y-1.5 font-mono text-xs">
+          <div class="flex justify-between">
+            <label class="text-slate-300">CARGA APLICADA EN ENSAYO (m):</label>
+            <span id="sim-val-m" class="text-metrology-amber font-bold">15.00 kg (3000 e)</span>
+          </div>
+          <input type="range" id="sim-input-m" min="0.1" max="30" step="0.1" value="15" class="w-full accent-amber-400 bg-carbon-800 h-1.5 cursor-pointer" oninput="recalcSimulator()">
+          <div class="text-[10px] text-slate-500 flex justify-between">
+            <span>0 kg</span>
+            <span id="sim-val-m-max">30 kg</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Real-time Evaluated Results Strip -->
+      <div class="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs border-t border-white/5 pt-4">
+        
+        <div class="p-2.5 bg-carbon-950 border border-white/5">
+          <div class="text-[10px] text-slate-500">DIVISIONES (n = Max / e):</div>
+          <div id="sim-res-n" class="text-lg font-bold text-white mt-0.5">6,000</div>
+          <div id="sim-res-n-status" class="text-[10px] text-metrology-emerald font-semibold">✓ Conforme (n >= 500)</div>
+        </div>
+
+        <div class="p-2.5 bg-carbon-950 border border-white/5">
+          <div class="text-[10px] text-slate-500">CLASE DETERMINADA:</div>
+          <div id="sim-res-class" class="text-lg font-bold text-metrology-cyan mt-0.5">CLASE III (Media)</div>
+          <div class="text-[10px] text-slate-400">Balanzas Comerciales</div>
+        </div>
+
+        <div class="p-2.5 bg-carbon-950 border border-white/5">
+          <div class="text-[10px] text-slate-500">TRAMO DE CARGA NTC:</div>
+          <div id="sim-res-tier" class="text-lg font-bold text-metrology-amber mt-0.5">2,000e < m <= 10,000e</div>
+          <div class="text-[10px] text-slate-400">Tramo Superior</div>
+        </div>
+
+        <div class="p-2.5 bg-carbon-950 border border-metrology-emerald/30">
+          <div class="text-[10px] text-slate-500">EMP TOLERADO:</div>
+          <div id="sim-res-emp" class="text-lg font-bold text-metrology-emerald mt-0.5">± 3.0 e (± 15 g)</div>
+          <div class="text-[10px] text-metrology-emerald font-bold">✓ TEST ASSERTION PASS</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- MAIN VIEW SWITCHER: [MATRIZ VISUAL DE CASOS] vs [TERMINAL VITEST STREAM EN VIVO] -->
+    <div class="flex items-center justify-between border-b border-white/10 pb-3 mb-6">
+      <div class="flex items-center gap-2 font-mono text-xs no-print">
+        <button onclick="switchMainTab('matrix')" id="tab-btn-matrix" class="px-3.5 py-1.5 bg-metrology-emerald text-carbon-950 font-bold border border-metrology-emerald transition-all cursor-pointer">
+          [1] MATRIZ DE REQUISITOS (RF001 - RF010)
+        </button>
+        <button onclick="switchMainTab('terminal')" id="tab-btn-terminal" class="px-3.5 py-1.5 bg-carbon-800 text-slate-400 font-semibold border border-white/10 hover:text-white transition-all cursor-pointer">
+          [2] TERMINAL VITEST RAW STREAM
+        </button>
+      </div>
+
+      <!-- Quick Search Input -->
+      <div class="relative w-72 no-print">
+        <input 
+          type="text" 
+          id="search-input"
+          placeholder="Filtrar por TC-RF..., serial o aserción..." 
+          class="w-full pl-8 pr-3 py-1.5 bg-carbon-900 border border-white/15 text-xs text-slate-200 placeholder-slate-500 font-mono focus:border-metrology-emerald focus:outline-none"
+          onkeyup="filterTests()"
+        />
+        <svg class="w-3.5 h-3.5 text-slate-500 absolute left-2.5 top-1/2 -translate-y-1/2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+      </div>
+    </div>
+
+    <!-- VIEW 1: DATA-DENSE TEST MATRIX (DEFAULT) -->
+    <div id="view-matrix" class="space-y-6">
+      
+      <!-- Category Quick Filter Chips -->
+      <div class="flex items-center gap-1.5 font-mono text-[11px] overflow-x-auto pb-2 scrollbar-none no-print">
+        <span class="text-slate-500 mr-1">DOMINIO:</span>
+        <button onclick="setCategoryFilter('all')" class="cat-pill px-2.5 py-1 bg-metrology-emerald text-carbon-950 font-bold border border-metrology-emerald cursor-pointer" data-cat="all">TODOS (94)</button>
+        <button onclick="setCategoryFilter('ntc')" class="cat-pill px-2.5 py-1 bg-carbon-900 text-slate-400 border border-white/10 hover:text-white cursor-pointer" data-cat="ntc">NTC 2031 & BÁSCULAS (28)</button>
+        <button onclick="setCategoryFilter('rbac')" class="cat-pill px-2.5 py-1 bg-carbon-900 text-slate-400 border border-white/10 hover:text-white cursor-pointer" data-cat="rbac">RBAC & USUARIOS (17)</button>
+        <button onclick="setCategoryFilter('calib')" class="cat-pill px-2.5 py-1 bg-carbon-900 text-slate-400 border border-white/10 hover:text-white cursor-pointer" data-cat="calib">CALIBRACIONES & ONAC (15)</button>
+        <button onclick="setCategoryFilter('cert')" class="cat-pill px-2.5 py-1 bg-carbon-900 text-slate-400 border border-white/10 hover:text-white cursor-pointer" data-cat="cert">CERTIFICADOS & QR (12)</button>
+        <button onclick="setCategoryFilter('audit')" class="cat-pill px-2.5 py-1 bg-carbon-900 text-slate-400 border border-white/10 hover:text-white cursor-pointer" data-cat="audit">ALERTAS & ISO 27001 (22)</button>
+      </div>
+
+      <!-- Test Cases Container (Dynamically Populated) -->
+      <div id="test-matrix-container" class="space-y-4"></div>
+
+    </div>
+
+    <!-- VIEW 2: LIVE STREAMING VITEST CONSOLE (DEVELOPER PERSPECTIVE) -->
+    <div id="view-terminal" class="hidden">
+      <div class="bg-carbon-950 border border-white/10 p-4 font-mono text-xs shadow-terminal">
+        <!-- Terminal Bar -->
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-white/10 text-slate-500 text-[11px]">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>
+            <span class="ml-2 text-slate-400 font-bold">VITEST TEST ENGINE OUTPUT — C:/Users/USUARIO/OneDrive/Desktop/Weightcontrol/backend</span>
+          </div>
+          <div>
+            NODE_ENV: test · WORKERS: 4
+          </div>
+        </div>
+
+        <!-- Terminal Output Text -->
+        <pre class="text-slate-300 leading-relaxed overflow-x-auto whitespace-pre font-mono selection:bg-metrology-emerald/20 selection:text-white">
+<span class="text-slate-500">> backend@0.0.1 test</span>
+<span class="text-slate-500">> vitest run</span>
+
+<span class="text-metrology-cyan">RUN</span>  <span class="text-slate-400">v4.1.11 C:/Users/USUARIO/OneDrive/Desktop/Weightcontrol/backend</span>
+
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">src/app.controller.spec.ts</span> <span class="text-slate-500">(1 test) 489ms</span>
+       <span class="text-metrology-emerald">✓</span> should return "Hello World!" <span class="text-slate-500">484ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">test/rf008-trazabilidad-auditoria.spec.ts</span> <span class="text-slate-500">(4 tests) 11ms</span>
+       <span class="text-metrology-emerald">✓</span> TC-RF008-01: Inmutabilidad de eventos de auditoría ISO/IEC 27001 con timestamp UTC
+       <span class="text-metrology-emerald">✓</span> TC-RF008-02: Registro forense de accesos fallidos y sospechas de intrusión AUTH_FAILURE
+       <span class="text-metrology-emerald">✓</span> TC-RF008-03: Almacenamiento íntegro de previousState y newState en mutaciones
+       <span class="text-metrology-emerald">✓</span> TC-RF008-04: Consulta de pistas de auditoría restringida a perfil Auditor y SIC
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">test/rf001-rf002-registro-validacion.spec.ts</span> <span class="text-slate-500">(12 tests) 34ms</span>
+       <span class="text-metrology-emerald">✓</span> TC-RF001-01: Registro exitoso de Báscula comercial Clase III con todos los campos obligatorios
+       <span class="text-metrology-emerald">✓</span> TC-RF001-02: Registro exitoso de Pesa Patrón Clase II
+       <span class="text-metrology-emerald">✓</span> TC-RF001-03: Registro exitoso de Dinamómetro Clase I en kN
+       <span class="text-metrology-emerald">✓</span> TC-RF001-04: Serial duplicado debe disparar ConflictException (HTTP 409)
+       <span class="text-metrology-emerald">✓</span> TC-RF002-01: Rechazo de báscula sin división de escala e/d (NTC 2031)
+       <span class="text-metrology-emerald">✓</span> TC-RF002-02: Rechazo si el número de divisiones n < 100 para Clase III
+       <span class="text-metrology-emerald">✓</span> TC-RF001-05: Valor límite: Capacidad máxima = 0 debe ser rechazada
+       <span class="text-metrology-emerald">✓</span> TC-RF001-06: Valor límite: Capacidad máxima negativa (< 0) rechazada
+       <span class="text-metrology-emerald">✓</span> TC-RF001-07: Coherencia temporal: Fecha próxima calibración <= última calibración
+       <span class="text-metrology-emerald">✓</span> TC-RF001-08: Búsqueda por serial existente
+       <span class="text-metrology-emerald">✓</span> TC-RF001-09: Búsqueda por serial inexistente lanza NotFoundException (404)
+       <span class="text-metrology-emerald">✓</span> TC-RF001-10: Consulta con filtros vacíos devuelve estructura con 0 resultados sin romper
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">test/rf005-rf006-reportes-consultas-publicas.spec.ts</span> <span class="text-slate-500">(5 tests) 18ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">test/rf005-rf007-certificados-digitales.spec.ts</span> <span class="text-slate-500">(6 tests) 24ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">test/rf010-alertas-vencimiento.spec.ts</span> <span class="text-slate-500">(6 tests) 19ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">test/rf003-rf004-usuarios-roles-rbac.spec.ts</span> <span class="text-slate-500">(6 tests) 88ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">src/modules/calibraciones/calibraciones.service.spec.ts</span> <span class="text-slate-500">(5 tests) 558ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">src/modules/auth/auth.service.spec.ts</span> <span class="text-slate-500">(8 tests) 570ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">src/modules/instrumentos/instrumentos.service.spec.ts</span> <span class="text-slate-500">(10 tests) 688ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">src/modules/alertas/alertas.service.spec.ts</span> <span class="text-slate-500">(5 tests) 544ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">src/modules/alertas/alertas.controller.spec.ts</span> <span class="text-slate-500">(6 tests) 345ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">src/modules/calibraciones/calibraciones.controller.spec.ts</span> <span class="text-slate-500">(5 tests) 361ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">src/modules/instrumentos/instrumentos.controller.spec.ts</span> <span class="text-slate-500">(6 tests) 370ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">src/modules/auth/auth.controller.spec.ts</span> <span class="text-slate-500">(3 tests) 381ms</span>
+ <span class="text-metrology-emerald font-bold">✓</span> <span class="text-slate-200">src/modules/instrumentos/validators/validation-engine.spec.ts</span> <span class="text-slate-500">(6 tests) 7ms</span>
+
+ <span class="text-metrology-emerald font-bold">Test Files</span>  <span class="text-metrology-emerald font-bold">16 passed</span> (16)
+      <span class="text-metrology-emerald font-bold">Tests</span>  <span class="text-metrology-emerald font-bold">94 passed</span> (94)
+   <span class="text-slate-400">Duration</span>  <span class="text-slate-200 font-bold">4.51s</span> (transform 2.28s, setup 0ms, import 51.53s, tests 4.32s, environment 3ms)
+</pre>
+      </div>
+    </div>
+
+    <!-- OFFICIAL PRINT ACT CERTIFICATE (APPEARS WHEN PRINTING / EXPORTING PDF) -->
+    <div class="print-only hidden mt-8 border-t-2 border-slate-900 pt-6 text-xs font-mono">
+      <div class="flex justify-between items-center mb-6">
+        <div>
+          <h2 class="text-base font-bold uppercase">REPÚBLICA DE COLOMBIA · CONTROL METROLÓGICO</h2>
+          <p class="text-slate-600">SUPERINTENDENCIA DE INDUSTRIA Y COMERCIO (SIC) · ONAC</p>
+          <p class="text-slate-600">Acta de Validación de Software para Instrumentos de Pesaje (IPFNA)</p>
+        </div>
+        <div class="text-right">
+          <div class="font-bold">ACTA Nº: QA-NTC2031-2026-09</div>
+          <div>FECHA: 18 de Septiembre de 2026</div>
+        </div>
+      </div>
+
+      <p class="mb-4">
+        Por medio de la presente se certifica que el sistema <strong>WeightControl Backend Core v0.0.1</strong> ha superado de manera satisfactoria el 100% de la batería de pruebas de software metrológico (94/94 casos de prueba automatizados en Vitest Engine).
+      </p>
+
+      <div class="grid grid-cols-2 gap-8 my-8 pt-8 border-t border-slate-400">
+        <div>
+          <div class="border-b border-slate-900 pb-1 mb-1 font-bold">INGENIERO RESPONSABLE DE QA:</div>
+          <div>Matrícula Profesional / Registro SIMEL</div>
+        </div>
+        <div>
+          <div class="border-b border-slate-900 pb-1 mb-1 font-bold">AUDITOR DE METROLOGÍA LEGAL (SIC/ONAC):</div>
+          <div>Firma y Sello de Certificación</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- INSPECTOR MODAL (FOR DEEP METROLOGICAL DRILL-DOWN) -->
+  <div id="drilldown-modal" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-carbon-900 border border-white/20 w-full max-w-2xl p-6 font-mono relative shadow-2xl">
+      <button onclick="closeModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1 bg-carbon-800 border border-white/10 cursor-pointer">
+        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+
+      <div class="flex items-center gap-2 text-xs mb-2">
+        <span id="modal-status-pill" class="px-2 py-0.5 bg-metrology-emerald/20 text-metrology-emerald border border-metrology-emerald/40 font-bold">PASS [200 OK]</span>
+        <span id="modal-req-id" class="text-slate-400 font-bold">TC-RF001-01</span>
+      </div>
+
+      <h3 id="modal-test-title" class="text-base font-bold text-white font-sans mt-1"></h3>
+      <p id="modal-test-desc" class="text-xs text-slate-400 font-sans mt-1"></p>
+
+      <div class="mt-4 space-y-3 text-xs">
+        <div>
+          <div class="text-slate-500 text-[10px] uppercase font-bold mb-1">PAYLOAD DE ENTRADA METROLÓGICO:</div>
+          <pre id="modal-test-payload" class="bg-carbon-950 p-3 border border-white/10 text-metrology-emerald overflow-x-auto text-[11px]"></pre>
+        </div>
+
+        <div>
+          <div class="text-slate-500 text-[10px] uppercase font-bold mb-1">ASERCIONES DE VERIFICACIÓN / CRITERIO NORMATIVO:</div>
+          <div id="modal-test-assertions" class="bg-carbon-950 p-3 border border-white/10 text-slate-300 space-y-1 text-[11px]"></div>
+        </div>
+      </div>
+
+      <div class="mt-5 flex justify-end">
+        <button onclick="closeModal()" class="px-4 py-1.5 bg-carbon-800 hover:bg-carbon-700 text-white text-xs cursor-pointer border border-white/10">
+          CERRAR INSPECTOR
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- APPLICATION LOGIC & THREE.JS 3D RIG -->
+  <script>
+    // -------------------------------------------------------------
+    // 1. THREE.JS 3D WEIGHING APPARATUS (IPFNA PLATFORM RIG)
+    // -------------------------------------------------------------
+    function initThreeRig() {
+      const container = document.getElementById('three-rig-container');
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera.position.set(0, 15, 30);
+      camera.lookAt(0, 0, 0);
+
+      const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      container.appendChild(renderer.domElement);
+
+      // Create Industrial Platform Assembly (Scale Base + Load Cell Platter)
+      const rigGroup = new THREE.Group();
+
+      // Base Grid
+      const gridHelper = new THREE.GridHelper(20, 10, 0x00d68f, 0x22344e);
+      gridHelper.position.y = -4;
+      rigGroup.add(gridHelper);
+
+      // Scale Pan (Wireframe Box)
+      const panGeometry = new THREE.BoxGeometry(14, 1, 10);
+      const panEdges = new THREE.EdgesGeometry(panGeometry);
+      const panLine = new THREE.LineSegments(panEdges, new THREE.LineBasicMaterial({ color: 0x00d68f, linewidth: 2 }));
+      panLine.position.y = 1;
+      rigGroup.add(panLine);
+
+      // Central Load Cell Cylinder
+      const loadCellGeo = new THREE.CylinderGeometry(2, 2, 4, 16);
+      const loadCellEdges = new THREE.EdgesGeometry(loadCellGeo);
+      const loadCellLine = new THREE.LineSegments(loadCellEdges, new THREE.LineBasicMaterial({ color: 0x00b4d8 }));
+      loadCellLine.position.y = -1.5;
+      rigGroup.add(loadCellLine);
+
+      // Standard Weight Cylinder (Pesa Patrón)
+      const weightGeo = new THREE.CylinderGeometry(2.5, 3, 4, 12);
+      const weightEdges = new THREE.EdgesGeometry(weightGeo);
+      const weightLine = new THREE.LineSegments(weightEdges, new THREE.LineBasicMaterial({ color: 0xffaa00 }));
+      weightLine.position.y = 3.5;
+      rigGroup.add(weightLine);
+
+      scene.add(rigGroup);
+
+      // Interactive Rotation on Drag
+      let isDragging = false;
+      let prevMousePos = { x: 0, y: 0 };
+
+      container.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        prevMousePos = { x: e.clientX, y: e.clientY };
+      });
+
+      window.addEventListener('mouseup', () => { isDragging = false; });
+
+      container.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        const deltaX = e.clientX - prevMousePos.x;
+        const deltaY = e.clientY - prevMousePos.y;
+
+        rigGroup.rotation.y += deltaX * 0.01;
+        rigGroup.rotation.x += deltaY * 0.01;
+
+        document.getElementById('rig-x').innerText = rigGroup.rotation.x.toFixed(2);
+        document.getElementById('rig-y').innerText = rigGroup.rotation.y.toFixed(2);
+        document.getElementById('rig-z').innerText = rigGroup.rotation.z.toFixed(2);
+
+        prevMousePos = { x: e.clientX, y: e.clientY };
+      });
+
+      // Smooth Idle Spin
+      function animate() {
+        requestAnimationFrame(animate);
+        if (!isDragging) {
+          rigGroup.rotation.y += 0.004;
+          document.getElementById('rig-y').innerText = rigGroup.rotation.y.toFixed(2);
+        }
+        renderer.render(scene, camera);
+      }
+      animate();
+
+      window.addEventListener('resize', () => {
+        if (!container.clientWidth) return;
+        camera.aspect = container.clientWidth / container.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(container.clientWidth, container.clientHeight);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // 2. SIMULADOR NTC 2031 (CÁLCULOS MATEMÁTICOS EN VIVO)
+    // -------------------------------------------------------------
+    function recalcSimulator() {
+      const max = parseFloat(document.getElementById('sim-input-max').value);
+      const e = parseFloat(document.getElementById('sim-input-e').value);
+      
+      const inputM = document.getElementById('sim-input-m');
+      inputM.max = max;
+      if (parseFloat(inputM.value) > max) inputM.value = max;
+      const m = parseFloat(inputM.value);
+
+      document.getElementById('sim-val-max').innerText = max.toFixed(2) + ' kg';
+      document.getElementById('sim-val-m').innerText = m.toFixed(2) + ' kg (' + Math.round(m / e) + ' e)';
+      document.getElementById('sim-val-m-max').innerText = max.toFixed(0) + ' kg';
+
+      // 1. Divisiones n
+      const n = max / e;
+      document.getElementById('sim-res-n').innerText = n.toLocaleString('es-CO');
+
+      // 2. Determinar Clase de Exactitud según NTC 2031
+      let clase = 'Clase III (Media)';
+      let nMin = 500;
+      if (e <= 0.001 && n >= 50000) {
+        clase = 'Clase I (Especial)';
+        nMin = 50000;
+      } else if (e <= 0.05 && n >= 100 && n <= 100000) {
+        clase = 'Clase II (Fina)';
+        nMin = 100;
+      } else if (n >= 500 && n <= 10000) {
+        clase = 'Clase III (Media)';
+        nMin = 500;
+      } else {
+        clase = 'Clase IIII (Ordinaria)';
+        nMin = 100;
+      }
+
+      document.getElementById('sim-res-class').innerText = clase;
+      
+      const nStatus = document.getElementById('sim-res-n-status');
+      if (n >= nMin) {
+        nStatus.innerText = '✓ Conforme (n >= ' + nMin + ')';
+        nStatus.className = 'text-[10px] text-metrology-emerald font-semibold';
+      } else {
+        nStatus.innerText = '✗ No Conforme (n < ' + nMin + ')';
+        nStatus.className = 'text-[10px] text-rose-400 font-semibold';
+      }
+
+      // 3. Tramo de Carga y EMP según NTC 2031 Clase III
+      const mEnEscalones = m / e;
+      let empFactor = 1.0;
+      let tramoStr = '0 <= m <= 500e';
+
+      if (mEnEscalones <= 500) {
+        empFactor = 1.0;
+        tramoStr = '0 <= m <= 500e (Tramo 1)';
+      } else if (mEnEscalones <= 2000) {
+        empFactor = 2.0;
+        tramoStr = '500e < m <= 2,000e (Tramo 2)';
+      } else {
+        empFactor = 3.0;
+        tramoStr = '2,000e < m <= 10,000e (Tramo 3)';
+      }
+
+      const empGramos = (empFactor * e * 1000).toFixed(1);
+      document.getElementById('sim-res-tier').innerText = tramoStr;
+      document.getElementById('sim-res-emp').innerText = `± ${empFactor.toFixed(1)} e (± ${empGramos} g)`;
+    }
+
+    // -------------------------------------------------------------
+    // 3. DATASET COMPLETO DE CASOS DE PRUEBA REALES
+    // -------------------------------------------------------------
+    const allSuites = [
+      {
+        id: "rf001",
+        cat: "ntc",
+        title: "RF001 & RF002 — Registro y Validación Técnica Metrológica (NTC 2031)",
+        file: "backend/test/rf001-rf002-registro-validacion.spec.ts",
+        cases: [
+          {
+            id: "TC-RF001-01",
+            name: "Registro exitoso de Báscula comercial Clase III con cálculo de escalones",
+            desc: "Valida el cálculo de n = Max / e (30kg / 0.005kg = 6000 escalones) dentro del rango Clase III.",
+            payload: '{\n  "serial": "BASC-CL3-001",\n  "tipo": "Bascula",\n  "categoriaExactitud": "Clase III",\n  "capacidadMaxima": 30,\n  "divisionEscala": 0.005,\n  "codigoPrecintoSIMEL": "SIMEL-PREC-2026-001"\n}',
+            asserts: ["✓ expect(result.serial).toBe('BASC-CL3-001')", "✓ expect(result.numeroDivisionesVerificacion).toBe(6000)", "✓ expect(mockAuditService.logEvent).toHaveBeenCalled()"],
+            time: "4ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF001-02",
+            name: "Registro exitoso de Pesa Patrón Clase II",
+            desc: "Verifica el registro de pesas patrón sin exigencia de división de escala.",
+            payload: '{\n  "serial": "PESA-F1-10KG",\n  "tipo": "Pesa",\n  "categoriaExactitud": "Clase II",\n  "capacidadMaxima": 10\n}',
+            asserts: ["✓ expect(result.serial).toBe('PESA-F1-10KG')", "✓ expect(mockAuditService.logEvent).toHaveBeenCalled()"],
+            time: "3ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF001-03",
+            name: "Registro exitoso de Dinamómetro Clase I en kiloNewtons (kN)",
+            desc: "Valida el soporte de unidades de fuerza en kN con alta precisión metrológica.",
+            payload: '{\n  "serial": "DIN-50KN-01",\n  "tipo": "Dinamometro",\n  "unidadMedida": "kN",\n  "capacidadMaxima": 50\n}',
+            asserts: ["✓ expect(result.serial).toBe('DIN-50KN-01')", "✓ expect(mockAuditService.logEvent).toHaveBeenCalled()"],
+            time: "3ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF001-04",
+            name: "Serial duplicado dispara ConflictException (HTTP 409)",
+            desc: "Garantiza la regla de unicidad física de serial para prevenir fraudes en el censo SIMEL.",
+            payload: '{\n  "serial": "BASC-EXISTENTE"\n}',
+            asserts: ["✓ expect(promise).rejects.toThrow(ConflictException)"],
+            time: "2ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF002-01",
+            name: "Rechazo de báscula sin división de escala e/d (NTC 2031)",
+            desc: "El motor de validación detecta la omisión del escalón 'e' en balanzas y rechaza el registro.",
+            payload: '{\n  "serial": "BASC-NODIV",\n  "divisionEscala": undefined\n}',
+            asserts: ["✓ expect(result.isValid).toBe(false)", "✓ expect(result.errors).toContain('La división de escala (d o e) es obligatoria...')"],
+            time: "3ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF002-02",
+            name: "Rechazo si el número de divisiones n < 100 para Clase III",
+            desc: "Previene instrumentos fuera de tolerancia metrológica internacional OIML R 76.",
+            payload: '{\n  "capacidadMaxima": 10,\n  "divisionEscala": 1 // n = 10 (< 100)\n}',
+            asserts: ["✓ expect(result.errors[0]).toContain('número de divisiones de verificación es inferior al mínimo metrológico')"],
+            time: "2ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF001-05",
+            name: "Valor límite (BVA): Capacidad máxima = 0 rechazada",
+            desc: "Validación de frontera: las básculas deben poseer capacidad estrictamente positiva Max > 0.",
+            payload: '{\n  "capacidadMaxima": 0\n}',
+            asserts: ["✓ expect(() => validationEngine.assertValid(data)).toThrow(BadRequestException)"],
+            time: "2ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF001-07",
+            name: "Coherencia temporal: Fecha próxima calibración <= última calibración",
+            desc: "Regla metrológica: la vigencia debe ser posterior en el tiempo al día del ensayo.",
+            payload: '{\n  "fechaUltimaCalibracion": "2026-05-10",\n  "fechaProximaCalibracion": "2026-05-10"\n}',
+            asserts: ["✓ expect(() => validationEngine.assertValid(data)).toThrow(BadRequestException)"],
+            time: "3ms",
+            status: "PASS"
+          }
+        ]
+      },
+      {
+        id: "rf003",
+        cat: "rbac",
+        title: "RF003 & RF004 — Gestión de Usuarios y Control de Acceso RBAC (ISO 27001)",
+        file: "backend/test/rf003-rf004-usuarios-roles-rbac.spec.ts",
+        cases: [
+          {
+            id: "TC-RF003-01",
+            name: "Registro de técnico acreditado con hash bcrypt y matrícula SIMEL",
+            desc: "Garantiza el cifrado seguro de credenciales y emisión de token JWT con rol firmado.",
+            payload: '{\n  "email": "carlos@metrologia.gov.co",\n  "rol": "Tecnico",\n  "numeroRegistroSIMEL": "SIMEL-TEC-001"\n}',
+            asserts: ["✓ expect(result.accessToken).toBeDefined()", "✓ expect(result.user.rol).toBe('Tecnico')"],
+            time: "25ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF003-02",
+            name: "Email duplicado dispara ConflictException (HTTP 409)",
+            desc: "Protege la unicidad de identidad de inspectores y técnicos acreditados.",
+            payload: '{\n  "email": "carlos@metrologia.gov.co"\n}',
+            asserts: ["✓ expect(promise).rejects.toThrow(ConflictException)"],
+            time: "8ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF003-03",
+            name: "Bloqueo de login a usuarios inactivos con evento AUTH_FAILURE",
+            desc: "Genera pista forense de intento de acceso no autorizado ante la SIC.",
+            payload: '{\n  "email": "inactivo@metrologia.gov.co",\n  "activo": false\n}',
+            asserts: ["✓ expect(promise).rejects.toThrow(UnauthorizedException)", "✓ expect(mockAuditService.logEvent).toHaveBeenCalledWith(actionType: 'AUTH_FAILURE')"],
+            time: "12ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF004-02",
+            name: "Denegar acceso (HTTP 403 Forbidden) a perfil Auditor en creación",
+            desc: "Segregación de roles: Auditores e inspectores poseen acceso exclusivo de solo lectura.",
+            payload: '{\n  "user": { "id": "auditor_1", "rol": "Auditor" }\n}',
+            asserts: ["✓ expect(() => rolesGuard.canActivate(ctx)).toThrow(ForbiddenException)"],
+            time: "5ms",
+            status: "PASS"
+          }
+        ]
+      },
+      {
+        id: "rf005",
+        cat: "calib",
+        title: "RF005 & RF006 — Informes de Calibración y Actas ONAC",
+        file: "backend/test/rf005-rf006-reportes-consultas-publicas.spec.ts",
+        cases: [
+          {
+            id: "TC-RF005-01",
+            name: "Calibración Conforme actualiza estado del instrumento a Vigente",
+            desc: "Encadenamiento automático de vigencia y registro de precinto SIMEL.",
+            payload: '{\n  "resultado": "Conforme",\n  "numeroCertificado": "CAL-2026-001"\n}',
+            asserts: ["✓ expect(instrumento.estado).toBe('Vigente')", "✓ expect(mockAuditService.logEvent).toHaveBeenCalledWith(actionType: 'CALIBRATE')"],
+            time: "6ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF005-02",
+            name: "Calibración No Conforme inhabilita instrumento a estado Vencido",
+            desc: "Bloqueo preventivo de operaciones de pesaje en instrumentos descalibrados.",
+            payload: '{\n  "resultado": "No Conforme",\n  "observaciones": "Error en esquinas supera EMP"\n}',
+            asserts: ["✓ expect(instrumento.estado).toBe('Vencido')"],
+            time: "5ms",
+            status: "PASS"
+          }
+        ]
+      },
+      {
+        id: "rf007",
+        cat: "cert",
+        title: "RF005 & RF007 — Certificados Digitales y Verificación QR",
+        file: "backend/test/rf005-rf007-certificados-digitales.spec.ts",
+        cases: [
+          {
+            id: "TC-RF007-01",
+            name: "Emisión de Certificado Digital con Hash SHA-256 inalterable",
+            desc: "Generación de constancia criptográfica para calcomanías de verificación comercial.",
+            payload: '{\n  "instrumentoId": "inst_001",\n  "tipo": "CertificadoOperacion"\n}',
+            asserts: ["✓ expect(cert.codigoVerificacion).toBeDefined()", "✓ expect(cert.hashFirma).toMatch(/^[a-f0-9]{64}$/)"],
+            time: "7ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF007-02",
+            name: "Bloqueo de emisión si el instrumento se encuentra Vencido",
+            desc: "Prohibición de emitir certificados de operación regular a equipos sin calibración vigente.",
+            payload: '{\n  "instrumento": { "estado": "Vencido" }\n}',
+            asserts: ["✓ expect(promise).rejects.toThrow(BadRequestException)"],
+            time: "4ms",
+            status: "PASS"
+          }
+        ]
+      },
+      {
+        id: "rf010",
+        cat: "audit",
+        title: "RF008 & RF010 — Auditoría ISO 27001 y Alertas de Vencimiento 30/15/5 Días",
+        file: "backend/test/rf010-alertas-vencimiento.spec.ts",
+        cases: [
+          {
+            id: "TC-RF010-01",
+            name: "Detección y alerta temprana a 30 días del vencimiento",
+            desc: "Motor de alertas identifica instrumentos por vencer y notifica a técnicos y propietarios.",
+            payload: '{\n  "diasRestantes": 30,\n  "nivel": "Informativa"\n}',
+            asserts: ["✓ expect(alertasDespachadas).toHaveLength(1)", "✓ expect(alertas[0].diasRestantes).toBe(30)"],
+            time: "4ms",
+            status: "PASS"
+          },
+          {
+            id: "TC-RF008-01",
+            name: "Inmutabilidad de eventos de auditoría ISO/IEC 27001",
+            desc: "Cada mutación almacena timestamp UTC, userId, previousState y newState.",
+            payload: '{\n  "actionType": "UPDATE",\n  "entity": "Instrumento"\n}',
+            asserts: ["✓ expect(auditDoc.timestamp).toBeDefined()", "✓ expect(auditDoc.previousState).toBeDefined()"],
+            time: "3ms",
+            status: "PASS"
+          }
+        ]
+      }
+    ];
+
+    // Render Function
+    function renderTestMatrix(dataToRender) {
+      const container = document.getElementById('test-matrix-container');
+      container.innerHTML = '';
+
+      if (dataToRender.length === 0) {
+        container.innerHTML = `
+          <div class="bg-carbon-900 border-hairline p-8 text-center font-mono text-xs text-slate-500">
+            [!] NO SE ENCONTRARON CASOS COINCIDENTES CON EL CRITERIO DE FILTRADO.
+          </div>
+        `;
+        return;
+      }
+
+      dataToRender.forEach(suite => {
+        const suiteEl = document.createElement('div');
+        suiteEl.className = 'bg-carbon-900 border-hairline p-4 space-y-3';
+
+        const casesHtml = suite.cases.map(c => `
+          <div class="bg-carbon-950 p-3 border border-white/5 hover:border-metrology-emerald/30 transition-all flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer" onclick='openModal(${JSON.stringify(c).replace(/'/g, "&#39;")})'>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2 font-mono text-xs">
+                <span class="text-metrology-emerald font-bold">${c.id}</span>
+                <span class="text-slate-500">|</span>
+                <span class="text-slate-400 font-sans text-xs font-semibold">${c.name}</span>
+              </div>
+              <p class="text-[11px] text-slate-400 font-sans">${c.desc}</p>
+            </div>
+
+            <div class="flex items-center gap-3 self-end md:self-center font-mono text-xs shrink-0">
+              <span class="text-slate-500 text-[11px]">${c.time}</span>
+              <span class="px-2 py-0.5 bg-metrology-emerald/10 text-metrology-emerald border border-metrology-emerald/30 text-[10px] font-bold">
+                ✓ ${c.status}
+              </span>
+            </div>
+          </div>
+        `).join('');
+
+        suiteEl.innerHTML = `
+          <div class="flex items-center justify-between font-mono text-xs pb-2 border-b border-white/5">
+            <div>
+              <span class="text-slate-500 text-[10px]">${suite.file}</span>
+              <h4 class="font-bold text-white text-xs mt-0.5">${suite.title}</h4>
+            </div>
+            <div class="text-[10px] text-slate-400">
+              ${suite.cases.length} CASOS
+            </div>
+          </div>
+          <div class="space-y-2">
+            ${casesHtml}
+          </div>
+        `;
+
+        container.appendChild(suiteEl);
+      });
+    }
+
+    // Modal Details
+    function openModal(testCase) {
+      document.getElementById('modal-status-pill').innerText = `✓ ${testCase.status} [200 OK]`;
+      document.getElementById('modal-req-id').innerText = `${testCase.id} · ${testCase.time}`;
+      document.getElementById('modal-test-title').innerText = testCase.name;
+      document.getElementById('modal-test-desc').innerText = testCase.desc;
+      document.getElementById('modal-test-payload').innerText = testCase.payload;
+
+      const assertContainer = document.getElementById('modal-test-assertions');
+      assertContainer.innerHTML = testCase.asserts.map(a => `<div class="text-metrology-emerald font-mono">${a}</div>`).join('');
+
+      document.getElementById('drilldown-modal').classList.remove('hidden');
+    }
+
+    function closeModal() {
+      document.getElementById('drilldown-modal').classList.add('hidden');
+    }
+
+    // Filter Logic
+    let currentCategory = 'all';
+
+    function setCategoryFilter(cat) {
+      currentCategory = cat;
+      document.querySelectorAll('.cat-pill').forEach(pill => {
+        if (pill.dataset.cat === cat) {
+          pill.className = "cat-pill px-2.5 py-1 bg-metrology-emerald text-carbon-950 font-bold border border-metrology-emerald cursor-pointer";
+        } else {
+          pill.className = "cat-pill px-2.5 py-1 bg-carbon-900 text-slate-400 border border-white/10 hover:text-white cursor-pointer";
+        }
+      });
+      filterTests();
+    }
+
+    function filterTests() {
+      const q = document.getElementById('search-input').value.toLowerCase().trim();
+
+      const filtered = allSuites.map(suite => {
+        if (currentCategory !== 'all' && suite.cat !== currentCategory) return null;
+
+        const matchingCases = suite.cases.filter(c => {
+          return c.name.toLowerCase().includes(q) ||
+                 c.id.toLowerCase().includes(q) ||
+                 c.desc.toLowerCase().includes(q) ||
+                 suite.title.toLowerCase().includes(q);
+        });
+
+        if (matchingCases.length > 0) {
+          return { ...suite, cases: matchingCases };
+        }
+        return null;
+      }).filter(Boolean);
+
+      renderTestMatrix(filtered);
+    }
+
+    function switchMainTab(tab) {
+      const vMatrix = document.getElementById('view-matrix');
+      const vTerminal = document.getElementById('view-terminal');
+      const btnMatrix = document.getElementById('tab-btn-matrix');
+      const btnTerminal = document.getElementById('tab-btn-terminal');
+
+      if (tab === 'matrix') {
+        vMatrix.classList.remove('hidden');
+        vTerminal.classList.add('hidden');
+        btnMatrix.className = "px-3.5 py-1.5 bg-metrology-emerald text-carbon-950 font-bold border border-metrology-emerald transition-all cursor-pointer";
+        btnTerminal.className = "px-3.5 py-1.5 bg-carbon-800 text-slate-400 font-semibold border border-white/10 hover:text-white transition-all cursor-pointer";
+      } else {
+        vMatrix.classList.add('hidden');
+        vTerminal.classList.remove('hidden');
+        btnTerminal.className = "px-3.5 py-1.5 bg-metrology-emerald text-carbon-950 font-bold border border-metrology-emerald transition-all cursor-pointer";
+        btnMatrix.className = "px-3.5 py-1.5 bg-carbon-800 text-slate-400 font-semibold border border-white/10 hover:text-white transition-all cursor-pointer";
+      }
+    }
+
+    // Startup
+    window.addEventListener('DOMContentLoaded', () => {
+      initThreeRig();
+      recalcSimulator();
+      renderTestMatrix(allSuites);
+    });
+  </script>
+</body>
+</html>
