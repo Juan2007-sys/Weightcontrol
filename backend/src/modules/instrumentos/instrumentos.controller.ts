@@ -48,6 +48,7 @@ export class InstrumentosController {
     return this.instrumentosService.create(createDto, userId, ipAddress, userAgent);
   }
 
+  @Public()
   @Get()
   async findAll(
     @Query() query: QueryInstrumentosDto,
@@ -55,6 +56,7 @@ export class InstrumentosController {
     return this.instrumentosService.findAll(query);
   }
 
+  @Public()
   @Get('stats/summary')
   async getStats(): Promise<InstrumentoStatsDto> {
     return this.instrumentosService.getStats();
@@ -84,6 +86,7 @@ export class InstrumentosController {
     return this.instrumentosService.verifyPublic(serial);
   }
 
+  @Public()
   @Get(':id')
   async findById(@Param('id') id: string): Promise<InstrumentoResponseDto> {
     return this.instrumentosService.findById(id);

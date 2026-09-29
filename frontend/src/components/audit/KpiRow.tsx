@@ -5,10 +5,10 @@ import { alertasService } from '../../services/alertas.service';
 
 export const KpiRow: React.FC = () => {
   const [stats, setStats] = useState({
-    total: 18420,
-    vigentes: 17020,
-    porVencer: 412,
-    vencidos: 29,
+    total: 0,
+    vigentes: 0,
+    porVencer: 0,
+    vencidos: 0,
   });
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export const KpiRow: React.FC = () => {
           alertasService.getStats(),
         ]);
 
-        if (instStats.status === 'fulfilled' && instStats.value && instStats.value.total > 0) {
+        if (instStats.status === 'fulfilled' && instStats.value) {
           const val: any = instStats.value;
           const vigentes = val.porEstado?.vigentes ?? val.vigentes ?? 0;
           const porVencer = val.porEstado?.porVencer ?? val.porVencer ?? 0;

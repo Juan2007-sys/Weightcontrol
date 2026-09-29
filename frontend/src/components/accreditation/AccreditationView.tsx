@@ -19,49 +19,13 @@ interface ValidationItem {
   pdfAvailable?: boolean;
 }
 
-const INITIAL_VALIDATIONS: ValidationItem[] = [
-  {
-    id: 'VAL-01',
-    actaNumero: 'CERT-2026-001',
-    oec: 'ONAC-18-LAB-042',
-    laboratorio: 'METROLOGÍA INDUSTRIAL DE COLOMBIA S.A.S.',
-    instrumento: 'Báscula Camionera 80t (Toledo Jaguar 8142)',
-    empStatus: 'Ensayos de excentricidad y repetibilidad conformes (± 1.0e)',
-    fechaEnsayo: '13/05/2025',
-    estado: 'APROBADA',
-    pdfAvailable: true,
-  },
-  {
-    id: 'VAL-02',
-    actaNumero: 'ACT-2025-00413-VAL',
-    oec: 'ONAC-22-LAB-019',
-    laboratorio: 'CALIBRACIONES Y PESAJE DEL VALLE LTDA.',
-    instrumento: 'Balanza Mostrador 30kg (Torrey L-EQ)',
-    empStatus: 'Error medio dentro de tolerancia permisible (± 0.5e)',
-    fechaEnsayo: '14/05/2025',
-    estado: 'PENDIENTE EVALUACIÓN',
-    pdfAvailable: true,
-  },
-  {
-    id: 'VAL-03',
-    actaNumero: 'ACT-2025-00399-ANT',
-    oec: 'ONAC-15-LAB-088',
-    laboratorio: 'SERVICIOS METROLÓGICOS ANTIOQUIA E.U.',
-    instrumento: 'Dispensador Gasolina Corriente (Gilbarco 500S)',
-    empStatus: 'Desviación límite de repetibilidad bajo observación (+0.25%)',
-    fechaEnsayo: '12/05/2025',
-    estado: 'OBSERVADA',
-    pdfAvailable: false,
-  },
-];
-
 interface AccreditationViewProps {
   instruments?: MetrologicalInstrument[];
 }
 
 export const AccreditationView: React.FC<AccreditationViewProps> = ({ instruments = [] }) => {
   const { user } = useAuth();
-  const [items, setItems] = useState<ValidationItem[]>(INITIAL_VALIDATIONS);
+  const [items, setItems] = useState<ValidationItem[]>([]);
   const [showCalibrationModal, setShowCalibrationModal] = useState(false);
   const [viewingCertItem, setViewingCertItem] = useState<ValidationItem | null>(null);
 

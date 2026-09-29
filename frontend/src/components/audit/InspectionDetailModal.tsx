@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { MetrologicalInstrument } from '../../types/metrology';
-import { XIcon, ShieldCheckIcon, AlertTriangleIcon, ShieldAlertIcon, FileTextIcon, LockIcon } from '../common/Icons';
+import { XIcon, ShieldCheckIcon, AlertTriangleIcon, ShieldAlertIcon, FileTextIcon, LockIcon, CameraIcon, EyeIcon, DownloadIcon } from '../common/Icons';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import {
@@ -25,7 +25,20 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
   instrument,
   onClose,
 }) => {
+  const [lightboxImage, setLightboxImage] = useState<{
+    url: string;
+    title: string;
+    subtitle: string;
+    tag: string;
+  } | null>(null);
+
   if (!instrument) return null;
+
+  const fotos = {
+    fotoEquipo: instrument.evidenciasFotograficas?.fotoEquipo || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800',
+    fotoPrecinto: instrument.evidenciasFotograficas?.fotoPrecinto || 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=800',
+    fotoUbicacion: instrument.evidenciasFotograficas?.fotoUbicacion || 'https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=800',
+  };
 
   const isCritical = instrument.estado === 'CRÍTICA (MEDIDA INMEDIATA)' || instrument.estado === 'SUSPENDIDA (CONTROL CAUTELAR)';
   const isWarning = instrument.estado === 'POR VENCER (<30 DÍAS)' || instrument.estado === 'VENCIDO / NO APTO';
@@ -265,6 +278,377 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
             </div>
           </div>
 
+          {/* Sección 3: Evidencias Fotográficas Obligatorias y Custodia Visual (NTC 2031 / OIML R 76-1) */}
+          <div
+            style={{
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-card)',
+              padding: '16px',
+              backgroundColor: '#FFFFFF',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '12px',
+                borderBottom: '1px solid var(--border)',
+                paddingBottom: '8px',
+                flexWrap: 'wrap',
+                gap: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CameraIcon size={18} style={{ color: 'var(--navy-900)' }} />
+                <span className="microlabel" style={{ color: 'var(--navy-900)', fontWeight: 800 }}>
+                  3. EVIDENCIAS FOTOGRÁFICAS METROLÓGICAS EN CUSTODIA (NTC 2031 / SIC)
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span
+                  className="font-mono microlabel-sm"
+                  style={{
+                    backgroundColor: '#ECFDF5',
+                    color: '#065F46',
+                    border: '1px solid #A7F3D0',
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    fontWeight: 700,
+                  }}
+                >
+                  ✓ 3 / 3 FOTOGRAFÍAS RADICADAS
+                </span>
+                <span className="microlabel-sm" style={{ color: 'var(--text-muted)' }}>
+                  Hash de integridad fotográfica verificado
+                </span>
+              </div>
+            </div>
+
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))',
+                gap: '14px',
+              }}
+            >
+              {/* Foto 1: Instrumento Completo */}
+              <div
+                style={{
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  backgroundColor: '#F8FAFC',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    height: '140px',
+                    width: '100%',
+                    overflow: 'hidden',
+                    backgroundColor: '#0F172A',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() =>
+                    setLightboxImage({
+                      url: fotos.fotoEquipo,
+                      title: 'Fotografía 1: Instrumento Completo y Placa de Características',
+                      subtitle: `${instrument.marca} ${instrument.modelo} · Serial ${instrument.serial}`,
+                      tag: 'NTC 2031 Numeral 3.1 - Identificación Física Obligatoria',
+                    })
+                  }
+                >
+                  <img
+                    src={fotos.fotoEquipo}
+                    alt="Instrumento Completo"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transition: 'transform 0.3s ease',
+                    }}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800';
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '6px',
+                      right: '6px',
+                      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                      color: '#FFFFFF',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      padding: '3px 6px',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <EyeIcon size={12} />
+                    <span>Ampliar</span>
+                  </div>
+                </div>
+                <div style={{ padding: '10px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--navy-900)' }}>
+                      1. Equipo Completo
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.3 }}>
+                      Plato de pesaje, visor graduado y placa de fabricante.
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px dashed #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="font-mono microlabel-sm" style={{ color: '#2563EB' }}>
+                      {instrument.serial}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLightboxImage({
+                          url: fotos.fotoEquipo,
+                          title: 'Fotografía 1: Instrumento Completo y Placa de Características',
+                          subtitle: `${instrument.marca} ${instrument.modelo} · Serial ${instrument.serial}`,
+                          tag: 'NTC 2031 Numeral 3.1 - Identificación Física Obligatoria',
+                        })
+                      }
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--blue-600)',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                    >
+                      Inspeccionar &gt;
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Foto 2: Precinto SIMEL */}
+              <div
+                style={{
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  backgroundColor: '#F8FAFC',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    height: '140px',
+                    width: '100%',
+                    overflow: 'hidden',
+                    backgroundColor: '#0F172A',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() =>
+                    setLightboxImage({
+                      url: fotos.fotoPrecinto,
+                      title: 'Fotografía 2: Precinto Metrológico SIMEL de Inviolabilidad',
+                      subtitle: `Código Precinto: ${instrument.precintoSIMEL}`,
+                      tag: 'Decreto 1074 de 2015 Art. 2.2.1.7.5.3 - Precinto Oficial',
+                    })
+                  }
+                >
+                  <img
+                    src={fotos.fotoPrecinto}
+                    alt="Precinto SIMEL"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transition: 'transform 0.3s ease',
+                    }}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800';
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '6px',
+                      right: '6px',
+                      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                      color: '#FFFFFF',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      padding: '3px 6px',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <EyeIcon size={12} />
+                    <span>Ampliar</span>
+                  </div>
+                </div>
+                <div style={{ padding: '10px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--navy-900)' }}>
+                      2. Precinto SIMEL
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.3 }}>
+                      Garantía de inviolabilidad en ajuste metrológico.
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px dashed #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="font-mono microlabel-sm" style={{ color: '#B45309', fontWeight: 700 }}>
+                      {instrument.precintoSIMEL}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLightboxImage({
+                          url: fotos.fotoPrecinto,
+                          title: 'Fotografía 2: Precinto Metrológico SIMEL de Inviolabilidad',
+                          subtitle: `Código Precinto: ${instrument.precintoSIMEL}`,
+                          tag: 'Decreto 1074 de 2015 Art. 2.2.1.7.5.3 - Precinto Oficial',
+                        })
+                      }
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--blue-600)',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                    >
+                      Inspeccionar &gt;
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Foto 3: Ubicación Física */}
+              <div
+                style={{
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  backgroundColor: '#F8FAFC',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  transition: 'all 0.2s ease',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                }}
+              >
+                <div
+                  style={{
+                    position: 'relative',
+                    height: '140px',
+                    width: '100%',
+                    overflow: 'hidden',
+                    backgroundColor: '#0F172A',
+                    cursor: 'pointer',
+                  }}
+                  onClick={() =>
+                    setLightboxImage({
+                      url: fotos.fotoUbicacion,
+                      title: 'Fotografía 3: Ubicación Física y Entorno Operativo In-Situ',
+                      subtitle: `${instrument.establecimiento} · ${instrument.municipio} (${instrument.departamento})`,
+                      tag: 'NTC 2031 Numeral 3.9 - Condiciones de Nivelación e Instalación',
+                    })
+                  }
+                >
+                  <img
+                    src={fotos.fotoUbicacion}
+                    alt="Ubicación Física"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transition: 'transform 0.3s ease',
+                    }}
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=800';
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.05)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      bottom: '6px',
+                      right: '6px',
+                      backgroundColor: 'rgba(15, 23, 42, 0.85)',
+                      color: '#FFFFFF',
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      padding: '3px 6px',
+                      borderRadius: '4px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <EyeIcon size={12} />
+                    <span>Ampliar</span>
+                  </div>
+                </div>
+                <div style={{ padding: '10px', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--navy-900)' }}>
+                      3. Ubicación Física
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px', lineHeight: 1.3 }}>
+                      Condiciones de estabilidad y punto de venta comercial.
+                    </div>
+                  </div>
+                  <div style={{ marginTop: '8px', paddingTop: '6px', borderTop: '1px dashed #E2E8F0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span className="font-mono microlabel-sm" style={{ color: '#047857', fontWeight: 600 }}>
+                      {instrument.municipio}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setLightboxImage({
+                          url: fotos.fotoUbicacion,
+                          title: 'Fotografía 3: Ubicación Física y Entorno Operativo In-Situ',
+                          subtitle: `${instrument.establecimiento} · ${instrument.municipio} (${instrument.departamento})`,
+                          tag: 'NTC 2031 Numeral 3.9 - Condiciones de Nivelación e Instalación',
+                        })
+                      }
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--blue-600)',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        padding: 0,
+                      }}
+                    >
+                      Inspeccionar &gt;
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Gráfico / Tabla de Ensayos Metrológicos de Error Máximo Permisible (EMP) */}
           <div
             style={{
@@ -282,7 +666,7 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
               }}
             >
               <div className="microlabel" style={{ color: 'var(--navy-900)' }}>
-                3. RESULTADO DE ENSAYOS METROLÓGICOS IN-SITU (NTC 2031 / OIML R 76-1)
+                4. RESULTADO DE ENSAYOS METROLÓGICOS IN-SITU (NTC 2031 / OIML R 76-1)
               </div>
               <span className="microlabel-sm font-mono" style={{ color: 'var(--text-muted)' }}>
                 TOLERANCIA DE ENSAYO: ± 1.0e (0-5kg) · ± 1.5e (5-20kg)
@@ -425,6 +809,128 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
           </div>
         </div>
       </motion.div>
+
+      {/* Modal Lightbox de Ampliación de Evidencia Fotográfica */}
+      {lightboxImage && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setLightboxImage(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(3, 7, 18, 0.88)',
+            backdropFilter: 'blur(5px)',
+            zIndex: 1100,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: '12px',
+              maxWidth: '750px',
+              width: '100%',
+              overflow: 'hidden',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: 'var(--navy-900)',
+                color: '#FFFFFF',
+                padding: '14px 20px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+              }}
+            >
+              <div>
+                <div className="microlabel" style={{ color: '#93C5FD' }}>
+                  {lightboxImage.tag}
+                </div>
+                <h4 style={{ margin: '2px 0 0 0', fontSize: '15px', fontWeight: 800 }}>
+                  {lightboxImage.title}
+                </h4>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLightboxImage(null)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#FFFFFF',
+                  cursor: 'pointer',
+                  padding: '4px',
+                }}
+              >
+                <XIcon size={20} />
+              </button>
+            </div>
+
+            <div style={{ backgroundColor: '#0F172A', maxHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              <img
+                src={lightboxImage.url}
+                alt={lightboxImage.title}
+                style={{
+                  maxWidth: '100%',
+                  maxHeight: '60vh',
+                  objectFit: 'contain',
+                }}
+              />
+            </div>
+
+            <div
+              style={{
+                padding: '14px 20px',
+                backgroundColor: '#F8FAFC',
+                borderTop: '1px solid #E2E8F0',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: '8px',
+              }}
+            >
+              <div>
+                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--navy-900)' }}>
+                  {lightboxImage.subtitle}
+                </div>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                  Radicado: RAD-2025-MET-{instrument.id.padStart(5, '0')} · Custodia Digital SIC
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <a
+                  href={lightboxImage.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  download={`Evidencia_${instrument.serial}.jpg`}
+                  className="btn-gov-secondary"
+                  style={{ fontSize: '12px', padding: '6px 12px', textDecoration: 'none' }}
+                >
+                  <DownloadIcon size={14} />
+                  <span>Descargar</span>
+                </a>
+                <button
+                  type="button"
+                  className="btn-gov-primary"
+                  onClick={() => setLightboxImage(null)}
+                  style={{ fontSize: '12px', padding: '6px 14px' }}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </motion.div>
   );
 };

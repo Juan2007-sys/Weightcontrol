@@ -1,6 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import type { ActiveScreen, FilterCriteria, MetrologicalInstrument } from './types/metrology';
-import { INITIAL_INSTRUMENTS } from './data/mockData';
 import { instrumentosService } from './services/instrumentos.service';
 import { useAuth } from './context/AuthContext';
 import { GovBar } from './components/common/GovBar';
@@ -33,7 +32,7 @@ const INITIAL_FILTERS: FilterCriteria = {
 export const App: React.FC = () => {
   const { user } = useAuth();
   const [activeScreen, setActiveScreen] = useState<ActiveScreen>('auditoria');
-  const [instruments, setInstruments] = useState<MetrologicalInstrument[]>(INITIAL_INSTRUMENTS);
+  const [instruments, setInstruments] = useState<MetrologicalInstrument[]>([]);
   const [filters, setFilters] = useState<FilterCriteria>(INITIAL_FILTERS);
   const [activeFilterQuery, setActiveFilterQuery] = useState<FilterCriteria>(INITIAL_FILTERS);
   const [publicVerificationSerial, setPublicVerificationSerial] = useState<string>('');
@@ -152,7 +151,7 @@ export const App: React.FC = () => {
       <TechnicalStatusStrip />
 
       {/* Contenido Principal Modular con Animación */}
-      <main style={{ flex: 1, overflow: 'hidden' }}>
+      <main style={{ flex: 1 }}>
         <AnimatePresence mode="wait">
           <motion.div
             key={activeScreen}

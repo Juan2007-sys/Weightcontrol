@@ -16,6 +16,11 @@ export interface RegistrationSuccessData {
   unidadMedida: string;
   codigoPrecintoSIMEL?: string;
   createdAt?: string;
+  evidenciasFotograficas?: {
+    fotoEquipo: string;
+    fotoPrecinto: string;
+    fotoUbicacion: string;
+  };
 }
 
 interface RegistrationSuccessModalProps {
@@ -200,6 +205,121 @@ export const RegistrationSuccessModal: React.FC<RegistrationSuccessModalProps> =
                 </div>
               </div>
             </div>
+
+            {/* Panel de Evidencias Fotográficas Custodiadas en BD */}
+            {data.evidenciasFotograficas && (
+              <div
+                style={{
+                  backgroundColor: '#F8FAFC',
+                  border: '1px solid #E2E8F0',
+                  borderRadius: '8px',
+                  padding: '14px',
+                  marginBottom: '16px',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    marginBottom: '10px',
+                  }}
+                >
+                  <span className="microlabel" style={{ color: 'var(--navy-900)', fontWeight: 800 }}>
+                    EVIDENCIAS FOTOGRÁFICAS RADICADAS EN BASE DE DATOS (NTC 2031):
+                  </span>
+                  <span
+                    className="font-mono microlabel-sm"
+                    style={{
+                      color: '#065F46',
+                      backgroundColor: '#D1FAE5',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      fontWeight: 700,
+                    }}
+                  >
+                    ✓ 3 FOTOS ALMACENADAS
+                  </span>
+                </div>
+
+                <div
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, 1fr)',
+                    gap: '10px',
+                  }}
+                >
+                  {/* Foto 1: Equipo */}
+                  <div
+                    style={{
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      overflow: 'hidden',
+                      backgroundColor: '#FFFFFF',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                    }}
+                  >
+                    <div style={{ height: '72px', width: '100%', overflow: 'hidden', backgroundColor: '#F1F5F9' }}>
+                      <img
+                        src={data.evidenciasFotograficas.fotoEquipo}
+                        alt="Equipo Completo"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800'; }}
+                      />
+                    </div>
+                    <div style={{ padding: '4px 6px', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: 'var(--navy-900)' }}>
+                      1. Equipo Completo
+                    </div>
+                  </div>
+
+                  {/* Foto 2: Precinto SIMEL */}
+                  <div
+                    style={{
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      overflow: 'hidden',
+                      backgroundColor: '#FFFFFF',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                    }}
+                  >
+                    <div style={{ height: '72px', width: '100%', overflow: 'hidden', backgroundColor: '#F1F5F9' }}>
+                      <img
+                        src={data.evidenciasFotograficas.fotoPrecinto}
+                        alt="Precinto SIMEL"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800'; }}
+                      />
+                    </div>
+                    <div style={{ padding: '4px 6px', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: 'var(--navy-900)' }}>
+                      2. Precinto SIMEL
+                    </div>
+                  </div>
+
+                  {/* Foto 3: Ubicación Física */}
+                  <div
+                    style={{
+                      borderRadius: '6px',
+                      border: '1px solid #CBD5E1',
+                      overflow: 'hidden',
+                      backgroundColor: '#FFFFFF',
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                    }}
+                  >
+                    <div style={{ height: '72px', width: '100%', overflow: 'hidden', backgroundColor: '#F1F5F9' }}>
+                      <img
+                        src={data.evidenciasFotograficas.fotoUbicacion}
+                        alt="Ubicación Física"
+                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=800'; }}
+                      />
+                    </div>
+                    <div style={{ padding: '4px 6px', textAlign: 'center', fontSize: '11px', fontWeight: 600, color: 'var(--navy-900)' }}>
+                      3. Ubicación Física
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Aviso de Disponibilidad Inmediata en el Buscador */}
             <div

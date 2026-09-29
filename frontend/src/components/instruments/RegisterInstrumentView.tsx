@@ -162,7 +162,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
     capacidadMin: '0.1',
     divisionEscala: '5',
     fotoEquipo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800',
-    fotoPrecinto: 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=800',
+    fotoPrecinto: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800',
     fotoUbicacion: 'https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=800',
     establecimiento: 'DISTRIBUIDORA DE ALIMENTOS DEL CENTRO S.A.S.',
     nit: '901.442.190-3',
@@ -1498,7 +1498,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           codigoPrecintoSIMEL: formData.precintoSIMEL.trim().toUpperCase(),
                           evidenciasFotograficas: {
                             fotoEquipo: formData.fotoEquipo || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800',
-                            fotoPrecinto: formData.fotoPrecinto || 'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=800',
+                            fotoPrecinto: formData.fotoPrecinto || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800',
                             fotoUbicacion: formData.fotoUbicacion || 'https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=800',
                           },
                           propietario: {
@@ -1619,6 +1619,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           unidadMedida: payload.unidadMedida,
                           codigoPrecintoSIMEL: payload.codigoPrecintoSIMEL,
                           createdAt: registeredResult?.createdAt || new Date().toISOString(),
+                          evidenciasFotograficas: payload.evidenciasFotograficas,
                         };
                         setSuccessModalData(successData);
                       } catch (err: any) {

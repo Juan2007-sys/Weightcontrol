@@ -35,6 +35,11 @@ export interface MetrologicalInstrument {
   accionRecomendada: string;    // Auto de Sellamiento Inmediato
   latitud: number;
   longitud: number;
+  evidenciasFotograficas?: {
+    fotoEquipo: string;
+    fotoPrecinto: string;
+    fotoUbicacion: string;
+  };
 }
 
 export interface KpiIndicator {

@@ -18,6 +18,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+import { Public } from '../../common/decorators/public.decorator.js';
 import { RolUsuario } from '../../schemas/usuario.schema.js';
 
 @Controller('alertas')
@@ -32,6 +33,7 @@ export class AlertasController {
     return this.alertasService.findAll(query);
   }
 
+  @Public()
   @Get('stats/summary')
   async getStats(): Promise<AlertasStatsDto> {
     return this.alertasService.getStats();

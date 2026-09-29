@@ -1,5 +1,11 @@
 import type { MetrologicalInstrument } from '../types/metrology';
 
+const DEFAULT_MOCK_PHOTOS = {
+  fotoEquipo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800',
+  fotoPrecinto: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800',
+  fotoUbicacion: 'https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=800',
+};
+
 export const INITIAL_INSTRUMENTS: MetrologicalInstrument[] = [
   {
     id: '1',
@@ -25,6 +31,7 @@ export const INITIAL_INSTRUMENTS: MetrologicalInstrument[] = [
     accionRecomendada: 'Auto de Sellamiento Inmediato y Apertura de Pliego de Cargos',
     latitud: 4.6985,
     longitud: -74.0889,
+    evidenciasFotograficas: DEFAULT_MOCK_PHOTOS,
   },
   {
     id: '2',
@@ -50,6 +57,7 @@ export const INITIAL_INSTRUMENTS: MetrologicalInstrument[] = [
     accionRecomendada: 'Medida Cautelar de Suspensión y Retiro de Manguera',
     latitud: 3.4516,
     longitud: -76.5320,
+    evidenciasFotograficas: DEFAULT_MOCK_PHOTOS,
   },
   {
     id: '3',
@@ -75,6 +83,7 @@ export const INITIAL_INSTRUMENTS: MetrologicalInstrument[] = [
     accionRecomendada: 'Requerimiento Administrativo de Calibración Periódica',
     latitud: 6.3315,
     longitud: -75.5582,
+    evidenciasFotograficas: DEFAULT_MOCK_PHOTOS,
   },
   {
     id: '4',
@@ -100,6 +109,7 @@ export const INITIAL_INSTRUMENTS: MetrologicalInstrument[] = [
     accionRecomendada: 'Emisión de Certificado Digital de Operación Regular',
     latitud: 10.9685,
     longitud: -74.7813,
+    evidenciasFotograficas: DEFAULT_MOCK_PHOTOS,
   },
   {
     id: '5',
@@ -125,5 +135,6 @@ export const INITIAL_INSTRUMENTS: MetrologicalInstrument[] = [
     accionRecomendada: 'Prohibición Expresa de Uso Comercial y Requerimiento SIC',
     latitud: 7.1254,
     longitud: -73.1198,
+    evidenciasFotograficas: DEFAULT_MOCK_PHOTOS,
   },
 ];

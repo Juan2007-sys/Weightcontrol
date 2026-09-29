@@ -13,6 +13,11 @@ export interface BackendInstrumento {
   divisionEscala?: number;
   numeroDivisionesVerificacion?: number;
   codigoPrecintoSIMEL?: string;
+  evidenciasFotograficas?: {
+    fotoEquipo: string;
+    fotoPrecinto: string;
+    fotoUbicacion: string;
+  };
   propietario?: {
     nombreRazonSocial?: string;
     nitRut?: string;
@@ -110,5 +115,6 @@ export function mapBackendInstrumentToFrontend(item: BackendInstrumento): Metrol
     accionRecomendada,
     latitud,
     longitud,
+    evidenciasFotograficas: item.evidenciasFotograficas,
   };
 }

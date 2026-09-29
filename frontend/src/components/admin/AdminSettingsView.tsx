@@ -18,57 +18,12 @@ import type { AuditEventItem } from '../../services/audit.service';
 import { apiClient } from '../../services/apiClient';
 import { useAuth } from '../../context/AuthContext';
 
-const INITIAL_USERS: UserItem[] = [
-  {
-    id: 'usr_admin_01',
-    nombre: 'Superintendente Administrador',
-    email: 'admin@weightcontrol.gov.co',
-    rol: 'ADMIN',
-    documentoIdentidad: '80123456',
-    entidad: 'Superintendencia de Industria y Comercio',
-    telefono: '+57 601 5870000',
-    activo: true,
-  },
-  {
-    id: 'usr_tec_01',
-    nombre: 'Ing. Carlos Alberto Gómez',
-    email: 'tecnico@oec-onac.org',
-    rol: 'TECNICO',
-    documentoIdentidad: '1020304050',
-    numeroRegistroSIMEL: 'SIMEL-TEC-2026-042',
-    tarjetaProfesional: 'TP-98234-COL',
-    entidad: 'Laboratorio Metrológico del Valle OEC',
-    telefono: '+57 310 9876543',
-    activo: true,
-  },
-  {
-    id: 'usr_aud_01',
-    nombre: 'Dra. Marcela Restrepo',
-    email: 'inspector@sic.gov.co',
-    rol: 'AUDITOR',
-    documentoIdentidad: '52987123',
-    entidad: 'Dirección de Metrología Legal SIC',
-    telefono: '+57 601 5870001',
-    activo: true,
-  },
-  {
-    id: 'usr_oec_01',
-    nombre: 'Comisión Técnica ONAC',
-    email: 'laboratorio@onac.org.co',
-    rol: 'INSTITUCION_ACREDITACION',
-    documentoIdentidad: '900123987',
-    entidad: 'Organismo Nacional de Acreditación',
-    telefono: '+57 601 7422340',
-    activo: true,
-  },
-];
-
 export const AdminSettingsView: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'usuarios' | 'trazabilidad' | 'parametros'>('usuarios');
 
   // Estados de Usuarios
-  const [users, setUsers] = useState<UserItem[]>(INITIAL_USERS);
+  const [users, setUsers] = useState<UserItem[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
