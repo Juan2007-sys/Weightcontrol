@@ -10,7 +10,10 @@ export interface UserProfile {
 }
 
 export interface AuthResponse {
-  access_token: string;
+  accessToken?: string;
+  access_token?: string;
+  tokenType?: string;
+  expiresIn?: string;
   user: UserProfile;
 }
 
@@ -20,8 +23,9 @@ export const authService = {
       email,
       password,
     });
-    if (response.access_token) {
-      setAuthToken(response.access_token);
+    const token = response.accessToken || response.access_token;
+    if (token) {
+      setAuthToken(token);
       localStorage.setItem('wc_auth_user', JSON.stringify(response.user));
     }
     return response;
@@ -35,8 +39,9 @@ export const authService = {
     cargo?: string;
   }): Promise<AuthResponse> => {
     const response = await apiClient.post<AuthResponse>('/auth/register', data);
-    if (response.access_token) {
-      setAuthToken(response.access_token);
+    const token = response.accessToken || response.access_token;
+    if (token) {
+      setAuthToken(token);
       localStorage.setItem('wc_auth_user', JSON.stringify(response.user));
     }
     return response;

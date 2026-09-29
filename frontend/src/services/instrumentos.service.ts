@@ -21,12 +21,18 @@ export interface CreateInstrumentoPayload {
   serial: string;
   marca: string;
   modelo: string;
-  tipo: 'Bascula' | 'Pesa' | 'Dinamometro';
-  categoriaExactitud: 'Clase I' | 'Clase II' | 'Clase III' | 'Clase IIII';
+  tipo: 'Bascula' | 'Pesa' | 'Dinamometro' | string;
+  categoriaExactitud: 'Clase I' | 'Clase II' | 'Clase III' | 'Clase IIII' | string;
   capacidadMaxima: number;
-  unidadMedida: 'g' | 'kg' | 't' | 'lb' | 'N' | 'kN';
+  capacidadMinima?: number;
+  unidadMedida: 'g' | 'kg' | 't' | 'lb' | 'N' | 'kN' | string;
   divisionEscala?: number;
   codigoPrecintoSIMEL?: string;
+  evidenciasFotograficas?: {
+    fotoEquipo: string;
+    fotoPrecinto: string;
+    fotoUbicacion: string;
+  };
   propietario?: {
     nombreRazonSocial: string;
     nitRut: string;
@@ -37,6 +43,35 @@ export interface CreateInstrumentoPayload {
   ubicacionFisica?: string;
   fechaUltimaCalibracion: string;
   fechaProximaCalibracion: string;
+}
+
+export interface PublicUltimoCertificadoDto {
+  numeroCertificado: string;
+  codigoFolio?: string;
+  fechaCalibracion: string;
+  resultado: string;
+  pdfUrl?: string;
+  hashSha256?: string;
+  laboratorioAcreditado?: string;
+}
+
+export interface PublicVerificationDto {
+  serial: string;
+  marca: string;
+  modelo: string;
+  tipo: string;
+  categoriaExactitud: string;
+  capacidadMaxima: number;
+  capacidadMinima: number;
+  unidadMedida: string;
+  divisionEscala: number;
+  estadoMetrologico: string;
+  esVigente: boolean;
+  fechaUltimaCalibracion: string;
+  fechaProximaCalibracion: string;
+  codigoPrecintoSIMEL?: string;
+  ultimoCertificado?: PublicUltimoCertificadoDto;
+  mensajeVerificacion: string;
 }
 
 export const instrumentosService = {
@@ -77,6 +112,10 @@ export const instrumentosService = {
   getBySerial: async (serial: string): Promise<MetrologicalInstrument> => {
     const raw = await apiClient.get<BackendInstrumento>(`/instrumentos/serial/${encodeURIComponent(serial)}`);
     return mapBackendInstrumentToFrontend(raw);
+  },
+
+  verifyPublic: async (serial: string): Promise<PublicVerificationDto> => {
+    return apiClient.get<PublicVerificationDto>(`/instrumentos/public/verificar/${encodeURIComponent(serial)}`);
   },
 
   create: async (data: CreateInstrumentoPayload): Promise<BackendInstrumento> => {

@@ -5,6 +5,7 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -15,6 +16,7 @@ import {
   EstadoInstrumento,
 } from '../../../schemas/instrumento.schema.js';
 import { PropietarioDto } from './propietario.dto.js';
+import { EvidenciasFotograficasDto } from './create-instrumento.dto.js';
 
 export class UpdateInstrumentoDto {
   @IsOptional()
@@ -47,6 +49,11 @@ export class UpdateInstrumentoDto {
   capacidadMaxima?: number;
 
   @IsOptional()
+  @IsNumber({}, { message: 'La capacidad mínima debe ser un valor numérico.' })
+  @Min(0, { message: 'La capacidad mínima no puede ser un número negativo.' })
+  capacidadMinima?: number;
+
+  @IsOptional()
   @IsEnum(UnidadMedida, {
     message: `La unidad de medida debe ser una de: ${Object.values(UnidadMedida).join(', ')}`,
   })
@@ -56,6 +63,11 @@ export class UpdateInstrumentoDto {
   @IsNumber({}, { message: 'La división de escala debe ser un valor numérico.' })
   @IsPositive({ message: 'La división de escala debe ser mayor a 0.' })
   divisionEscala?: number;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => EvidenciasFotograficasDto)
+  evidenciasFotograficas?: EvidenciasFotograficasDto;
 
   @IsOptional()
   @IsString({ message: 'El código de precinto SIMEL debe ser una cadena de texto.' })

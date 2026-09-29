@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import type { ActiveScreen, FilterCriteria, MetrologicalInstrument } from './types/metrology';
 import { INITIAL_INSTRUMENTS } from './data/mockData';
 import { instrumentosService } from './services/instrumentos.service';
+import { useAuth } from './context/AuthContext';
 import { GovBar } from './components/common/GovBar';
 import { BrandHeader } from './components/common/BrandHeader';
 import { TechnicalStatusStrip } from './components/common/TechnicalStatusStrip';
@@ -16,6 +17,7 @@ import { RegisterInstrumentView } from './components/instruments/RegisterInstrum
 import { InstrumentsListView } from './components/instruments/InstrumentsListView';
 import { AccreditationView } from './components/accreditation/AccreditationView';
 import { AdminSettingsView } from './components/admin/AdminSettingsView';
+import { PublicVerificationView } from './components/public/PublicVerificationView';
 import { LoginView } from './components/auth/LoginView';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -29,10 +31,12 @@ const INITIAL_FILTERS: FilterCriteria = {
 };
 
 export const App: React.FC = () => {
+  const { user } = useAuth();
   const [activeScreen, setActiveScreen] = useState<ActiveScreen>('auditoria');
   const [instruments, setInstruments] = useState<MetrologicalInstrument[]>(INITIAL_INSTRUMENTS);
   const [filters, setFilters] = useState<FilterCriteria>(INITIAL_FILTERS);
   const [activeFilterQuery, setActiveFilterQuery] = useState<FilterCriteria>(INITIAL_FILTERS);
+  const [publicVerificationSerial, setPublicVerificationSerial] = useState<string>('');
 
   const fetchInstruments = useCallback(async () => {
     try {
@@ -63,6 +67,24 @@ export const App: React.FC = () => {
     setActiveFilterQuery({ ...filters });
     toast.success('Criterios de filtrado metrológico aplicados.');
   };
+
+  // Nivel de privilegio dinámico según rol
+  const privilegeLevelText = useMemo(() => {
+    if (!user) return 'NIVEL L1 · CONSULTA PÚBLICA NACIONAL';
+    switch (user.rol) {
+      case 'ADMIN':
+        return `NIVEL L4 · ADMINISTRADOR NACIONAL (${user.nombre})`;
+      case 'AUDITOR':
+      case 'AUDITOR_SIC':
+        return `NIVEL L3 · AUDITOR DE VIGILANCIA SIC (${user.nombre})`;
+      case 'INSTITUCION_ACREDITACION':
+        return `NIVEL L3 · COMISIÓN TÉCNICA ONAC (${user.nombre})`;
+      case 'TECNICO':
+        return `NIVEL L2 · TÉCNICO METRÓLOGO (${user.nombre})`;
+      default:
+        return `NIVEL L1 · USUARIO (${user.nombre})`;
+    }
+  }, [user]);
 
   // Filtrado reactivo de datos según criterios aplicados
   const filteredInstruments = useMemo(() => {
@@ -147,7 +169,7 @@ export const App: React.FC = () => {
                   subSection="AUDITORÍA Y FISCALIZACIÓN NACIONAL DE INSTRUMENTOS"
                   oecCode="ONAC-18-LAB-042"
                   scopeExpiration="31/DIC/2026"
-                  privilegeLevel="NIVEL L3 · AUDITOR DE VIGILANCIA SIC"
+                  privilegeLevel={privilegeLevelText}
                 />
 
                 {/* 5. Bloque de Título H1 con Barra de 4px y Enlaces Normativos */}
@@ -155,7 +177,13 @@ export const App: React.FC = () => {
                   onExportReport={(format) => {
                     toast.success(`Generando Informe Forense Oficial (${format}) con trazabilidad NIST UTC-5 y hash SHA-256...`);
                   }}
-                  onNewInspection={() => setActiveScreen('registro')}
+                  onNewInspection={() => {
+                    if (user && user.rol === 'AUDITOR') {
+                      toast.error('🛑 Privilegio Restringido: Los Auditores tienen permiso exclusivo de consulta y fiscalización forense.');
+                      return;
+                    }
+                    setActiveScreen('registro');
+                  }}
                 />
 
                 {/* 6. Fila de 4 Tarjetas KPI con Borde Lateral Semántico */}
@@ -184,11 +212,20 @@ export const App: React.FC = () => {
                   subSection="REGISTRAR NUEVO INSTRUMENTO METROLÓGICO (RUMP)"
                   oecCode="ONAC-18-LAB-042"
                   scopeExpiration="31/DIC/2026"
-                  privilegeLevel="NIVEL L2 · TÉCNICO METRÓLOGO"
+                  privilegeLevel={privilegeLevelText}
                 />
                 <RegisterInstrumentView
+                  existingInstruments={instruments}
                   onBackToAudit={() => setActiveScreen('auditoria')}
-                  onRegisteredSuccess={() => {
+                  onConsultSerialImmediately={(serial) => {
+                    fetchInstruments();
+                    setPublicVerificationSerial(serial);
+                    setActiveScreen('consulta-publica');
+                  }}
+                  onRegisteredSuccess={(newItem?: MetrologicalInstrument) => {
+                    if (newItem) {
+                      setInstruments((prev) => [newItem, ...prev.filter((x) => x.serial.toUpperCase() !== newItem.serial.toUpperCase())]);
+                    }
                     fetchInstruments();
                     toast.success('¡Instrumento metrológico registrado e inscrito en la base nacional!');
                     setActiveScreen('auditoria');
@@ -205,11 +242,19 @@ export const App: React.FC = () => {
                   subSection="MIS INSTRUMENTOS REGISTRADOS"
                   oecCode="ONAC-18-LAB-042"
                   scopeExpiration="31/DIC/2026"
-                  privilegeLevel="NIVEL L2 · TÉCNICO METRÓLOGO"
+                  privilegeLevel={privilegeLevelText}
                 />
                 <InstrumentsListView
                   instruments={instruments}
-                  onNewInstrument={() => setActiveScreen('registro')}
+                  onNewInstrument={() => {
+                    if (user && user.rol === 'AUDITOR') {
+                      toast.error('🛑 Privilegio Restringido: Los Auditores no tienen permiso para registrar instrumentos.');
+                      return;
+                    }
+                    setActiveScreen('registro');
+                  }}
+                  onRefresh={fetchInstruments}
+                  onDeleteInstrument={(id) => setInstruments((prev) => prev.filter((item) => item.id !== id))}
                 />
                 <LegalBanner />
               </>
@@ -222,9 +267,9 @@ export const App: React.FC = () => {
                   subSection="VALIDACIONES PENDIENTES DE ACREDITACIÓN (ACTAS Y ENSAYOS)"
                   oecCode="ONAC-18-LAB-042"
                   scopeExpiration="31/DIC/2026"
-                  privilegeLevel="NIVEL L3 · COMISIÓN TÉCNICA ONAC"
+                  privilegeLevel={privilegeLevelText}
                 />
-                <AccreditationView />
+                <AccreditationView instruments={instruments} />
                 <LegalBanner />
               </>
             )}
@@ -233,12 +278,29 @@ export const App: React.FC = () => {
               <>
                 <Breadcrumbs
                   moduleName="CONSOLA DE MANDO CENTRALIZADA"
-                  subSection="ADMINISTRACIÓN DEL SISTEMA Y PARÁMETROS GLOBALES"
+                  subSection="ADMINISTRACIÓN DEL SISTEMA, USUARIOS Y RBAC"
                   oecCode="ONAC-18-LAB-042"
                   scopeExpiration="31/DIC/2026"
-                  privilegeLevel="NIVEL L4 · ADMINISTRADOR NACIONAL"
+                  privilegeLevel={privilegeLevelText}
                 />
                 <AdminSettingsView />
+                <LegalBanner />
+              </>
+            )}
+
+            {activeScreen === 'consulta-publica' && (
+              <>
+                <Breadcrumbs
+                  moduleName="PORTAL NACIONAL DE TRANSPARENCIA"
+                  subSection="CONSULTA PÚBLICA DE INSTRUMENTOS METROLÓGICOS Y CERTIFICADOS (RUMP)"
+                  oecCode="PUNTO ABIERTO CIUDADANO"
+                  scopeExpiration="PERPETUA"
+                  privilegeLevel="ACCESO PÚBLICO IRRESTRINGIDO (HABEAS DATA)"
+                />
+                <PublicVerificationView
+                  initialSerial={publicVerificationSerial}
+                  onBack={() => setActiveScreen('auditoria')}
+                />
                 <LegalBanner />
               </>
             )}

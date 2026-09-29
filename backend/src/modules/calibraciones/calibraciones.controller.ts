@@ -11,9 +11,10 @@ import {
   Put,
   Query,
   Req,
+  Res,
   UseGuards,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { CalibracionesService } from './calibraciones.service.js';
 import { CreateCalibracionDto } from './dto/create-calibracion.dto.js';
 import { UpdateCalibracionDto } from './dto/update-calibracion.dto.js';
@@ -23,6 +24,7 @@ import { PaginatedResponseDto } from '../instrumentos/dto/paginated-response.dto
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { Public } from '../../common/decorators/public.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { RolUsuario } from '../../schemas/usuario.schema.js';
 
@@ -45,6 +47,7 @@ export class CalibracionesController {
   }
 
   @Get()
+  @Public()
   async findAll(
     @Query() query: QueryCalibracionesDto,
   ): Promise<PaginatedResponseDto<CalibracionResponseDto>> {
@@ -52,10 +55,41 @@ export class CalibracionesController {
   }
 
   @Get('instrumento/:instrumentoId')
+  @Public()
   async findByInstrumento(
     @Param('instrumentoId') instrumentoId: string,
   ): Promise<CalibracionResponseDto[]> {
     return this.calibracionesService.findByInstrumento(instrumentoId);
+  }
+
+  @Get(':id/pdf')
+  @Public()
+  async downloadPdf(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const pdfBuffer = await this.calibracionesService.generatePdf(id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="Certificado-Calibracion-${id}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+    res.end(pdfBuffer);
+  }
+
+  @Get('certificado/:id/pdf')
+  @Public()
+  async downloadCertificadoPdf(
+    @Param('id') id: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const pdfBuffer = await this.calibracionesService.generatePdf(id);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `inline; filename="Certificado-Calibracion-${id}.pdf"`,
+      'Content-Length': pdfBuffer.length,
+    });
+    res.end(pdfBuffer);
   }
 
   @Get(':id')

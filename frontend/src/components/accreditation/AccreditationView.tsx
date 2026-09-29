@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { CheckIcon, XIcon } from '../common/Icons';
+import { CheckIcon, XIcon, PlusIcon, DownloadIcon, FileTextIcon, ShieldCheckIcon, EyeIcon } from '../common/Icons';
 import { calibracionesService } from '../../services/calibraciones.service';
+import type { MetrologicalInstrument } from '../../types/metrology';
+import { RegisterCalibrationModal } from '../calibration/RegisterCalibrationModal';
+import { PdfCertificateViewerModal } from '../common/PdfCertificateViewerModal';
+import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
 
 interface ValidationItem {
@@ -12,18 +16,20 @@ interface ValidationItem {
   empStatus: string;
   fechaEnsayo: string;
   estado: 'PENDIENTE EVALUACIÓN' | 'APROBADA' | 'OBSERVADA';
+  pdfAvailable?: boolean;
 }
 
 const INITIAL_VALIDATIONS: ValidationItem[] = [
   {
     id: 'VAL-01',
-    actaNumero: 'ACT-2025-00412-BOG',
+    actaNumero: 'CERT-2026-001',
     oec: 'ONAC-18-LAB-042',
     laboratorio: 'METROLOGÍA INDUSTRIAL DE COLOMBIA S.A.S.',
     instrumento: 'Báscula Camionera 80t (Toledo Jaguar 8142)',
     empStatus: 'Ensayos de excentricidad y repetibilidad conformes (± 1.0e)',
     fechaEnsayo: '13/05/2025',
-    estado: 'PENDIENTE EVALUACIÓN',
+    estado: 'APROBADA',
+    pdfAvailable: true,
   },
   {
     id: 'VAL-02',
@@ -34,6 +40,7 @@ const INITIAL_VALIDATIONS: ValidationItem[] = [
     empStatus: 'Error medio dentro de tolerancia permisible (± 0.5e)',
     fechaEnsayo: '14/05/2025',
     estado: 'PENDIENTE EVALUACIÓN',
+    pdfAvailable: true,
   },
   {
     id: 'VAL-03',
@@ -44,34 +51,43 @@ const INITIAL_VALIDATIONS: ValidationItem[] = [
     empStatus: 'Desviación límite de repetibilidad bajo observación (+0.25%)',
     fechaEnsayo: '12/05/2025',
     estado: 'OBSERVADA',
+    pdfAvailable: false,
   },
 ];
 
-export const AccreditationView: React.FC = () => {
+interface AccreditationViewProps {
+  instruments?: MetrologicalInstrument[];
+}
+
+export const AccreditationView: React.FC<AccreditationViewProps> = ({ instruments = [] }) => {
+  const { user } = useAuth();
   const [items, setItems] = useState<ValidationItem[]>(INITIAL_VALIDATIONS);
+  const [showCalibrationModal, setShowCalibrationModal] = useState(false);
+  const [viewingCertItem, setViewingCertItem] = useState<ValidationItem | null>(null);
+
+  const loadCalibraciones = async () => {
+    try {
+      const res = await calibracionesService.getAll();
+      if (res.data && res.data.length > 0) {
+        const mapped: ValidationItem[] = res.data.map((c) => ({
+          id: c.id || c._id || c.numeroCertificado,
+          actaNumero: c.numeroCertificado,
+          oec: c.codigoPrecintoSIMEL || 'ONAC-18-LAB-042',
+          laboratorio: c.laboratorioAcreditado,
+          instrumento: typeof c.instrumento === 'object' && c.instrumento ? `${c.instrumento.marca || ''} ${c.instrumento.modelo || ''}` : `Equipo ${c.instrumento}`,
+          empStatus: c.observaciones || `Dictamen: ${c.resultado} (Incertidumbre: ${c.incertidumbreExpandida || '±0.5e'})`,
+          fechaEnsayo: new Date(c.fechaCalibracion).toLocaleDateString('es-CO'),
+          estado: c.resultado === 'Conforme' ? 'APROBADA' : 'OBSERVADA',
+          pdfAvailable: true,
+        }));
+        setItems(mapped);
+      }
+    } catch {
+      // Fallback a iniciales
+    }
+  };
 
   useEffect(() => {
-    const loadCalibraciones = async () => {
-      try {
-        const res = await calibracionesService.getAll();
-        if (res.data && res.data.length > 0) {
-          const mapped: ValidationItem[] = res.data.map((c) => ({
-            id: c.id || c._id || c.numeroCertificado,
-            actaNumero: c.numeroCertificado,
-            oec: c.codigoPrecintoSIMEL || 'ONAC-18-LAB-042',
-            laboratorio: c.laboratorioAcreditado,
-            instrumento: typeof c.instrumento === 'object' && c.instrumento ? `${c.instrumento.marca || ''} ${c.instrumento.modelo || ''}` : `Equipo ${c.instrumento}`,
-            empStatus: c.observaciones || `Dictamen: ${c.resultado} (Incertidumbre: ${c.incertidumbreExpandida || '±0.5e'})`,
-            fechaEnsayo: new Date(c.fechaCalibracion).toLocaleDateString('es-CO'),
-            estado: c.resultado === 'Conforme' ? 'APROBADA' : 'OBSERVADA',
-          }));
-          setItems(mapped);
-        }
-      } catch {
-        // Fallback a iniciales
-      }
-    };
-
     loadCalibraciones();
   }, []);
 
@@ -86,35 +102,73 @@ export const AccreditationView: React.FC = () => {
     }
   };
 
+  const handleDownloadPdf = async (certId: string) => {
+    try {
+      await calibracionesService.triggerPdfDownload(certId);
+      toast.success(`Certificado ${certId} descargado en formato PDF oficial.`);
+    } catch {
+      toast.error(`No se pudo descargar el PDF del certificado ${certId}.`);
+    }
+  };
+
   return (
     <div style={{ paddingBottom: '32px' }}>
       <div className="gov-container">
-        {/* Encabezado */}
+        {/* Encabezado con Botón de Registrar Nueva Calibración (HU-04) */}
         <div
           style={{
-            borderLeft: '4px solid var(--navy-900)',
-            paddingLeft: '18px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            gap: '24px',
             marginBottom: '24px',
+            flexWrap: 'wrap',
           }}
         >
-          <div className="microlabel" style={{ color: 'var(--text-muted)' }}>
-            ORGANISMOS ACREDITADOS · GESTIÓN DE ENSAYOS Y ACTAS METROLÓGICAS
-          </div>
-          <h1
+          <div
             style={{
-              fontFamily: 'var(--font-heading)',
-              fontSize: '36px',
-              fontWeight: 800,
-              color: 'var(--navy-900)',
-              margin: '4px 0 0 0',
-              letterSpacing: '-0.02em',
+              borderLeft: '4px solid var(--navy-900)',
+              paddingLeft: '18px',
             }}
           >
-            Validaciones Pendientes de Acreditación
-          </h1>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Revisión formal de actas de ensayo emitidas por Organismos Evaluadores de la Conformidad acreditados ante el ONAC.
-          </p>
+            <div className="microlabel" style={{ color: 'var(--text-muted)' }}>
+              ORGANISMOS ACREDITADOS · GESTIÓN DE ENSAYOS Y ACTAS METROLÓGICAS
+            </div>
+            <h1
+              style={{
+                fontFamily: 'var(--font-heading)',
+                fontSize: '34px',
+                fontWeight: 800,
+                color: 'var(--navy-900)',
+                margin: '4px 0 0 0',
+                letterSpacing: '-0.02em',
+              }}
+            >
+              Ensayos y Certificados de Calibración
+            </h1>
+            <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
+              Emisión oficial, validación de Error Máximo Permitido (EMP) y sellamiento inmutable de certificados bajo la norma <strong>NTC 2031</strong>.
+            </p>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              type="button"
+              className="btn-gov-primary"
+              onClick={() => {
+                if (user && user.rol === 'AUDITOR') {
+                  toast.error('🛑 Privilegio Restringido: Los Auditores no tienen permiso para emitir certificados de calibración.');
+                  return;
+                }
+                setShowCalibrationModal(true);
+              }}
+              style={{ padding: '10px 18px', fontSize: '13px', gap: '8px' }}
+            >
+              <PlusIcon size={16} />
+              <ShieldCheckIcon size={16} />
+              <span>Registrar Calibración y Emitir Certificado</span>
+            </button>
+          </div>
         </div>
 
         {/* Tabla de Actas y Ensayos */}
@@ -135,7 +189,7 @@ export const AccreditationView: React.FC = () => {
                 <th scope="col" className="microlabel" style={{ padding: '12px 16px', color: '#FFFFFF' }}>EQUIPO METROLÓGICO</th>
                 <th scope="col" className="microlabel" style={{ padding: '12px 16px', color: '#FFFFFF' }}>DICTAMEN DE ENSAYO EMP</th>
                 <th scope="col" className="microlabel" style={{ padding: '12px 16px', color: '#FFFFFF', textAlign: 'center' }}>ESTADO</th>
-                <th scope="col" className="microlabel" style={{ padding: '12px 16px', color: '#FFFFFF', textAlign: 'right' }}>RESOLUCIÓN</th>
+                <th scope="col" className="microlabel" style={{ padding: '12px 16px', color: '#FFFFFF', textAlign: 'right' }}>ACCIONES &amp; CERTIFICADO</th>
               </tr>
             </thead>
             <tbody>
@@ -161,42 +215,90 @@ export const AccreditationView: React.FC = () => {
                     </span>
                   </td>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                    {item.estado === 'PENDIENTE EVALUACIÓN' ? (
-                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }}>
-                        <button
-                          type="button"
-                          className="btn-gov-compact"
-                          onClick={() => handleAction(item.id, 'APROBADA')}
-                          style={{ color: '#065F46', borderColor: 'var(--ok)' }}
-                          title="Aprobar e inscribir dictamen en RUMP"
-                        >
-                          <CheckIcon size={12} />
-                          <span>Aprobar</span>
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-gov-compact"
-                          onClick={() => handleAction(item.id, 'OBSERVADA')}
-                          style={{ color: '#991B1B', borderColor: 'var(--danger)' }}
-                          title="Devolver con observaciones técnicas"
-                        >
-                          <XIcon size={12} />
-                          <span>Observar</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <span className="microlabel-sm font-mono" style={{ color: 'var(--text-muted)' }}>
-                        PROCESADA
-                      </span>
-                    )}
+                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                      <button
+                        type="button"
+                        className="btn-gov-compact"
+                        onClick={() => setViewingCertItem(item)}
+                        style={{ color: '#0369A1', borderColor: '#7DD3FC', backgroundColor: '#F0F9FF', fontWeight: 600 }}
+                        title="Visualizar Certificado Oficial interactivo en alta definición"
+                      >
+                        <EyeIcon size={12} />
+                        <span>Ver</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn-gov-compact"
+                        onClick={() => handleDownloadPdf(item.actaNumero)}
+                        style={{ color: '#1E40AF', borderColor: '#93C5FD', backgroundColor: '#EFF6FF', fontWeight: 600 }}
+                        title="Descargar Certificado Oficial en PDF con QR y firma criptográfica"
+                      >
+                        <DownloadIcon size={12} />
+                        <FileTextIcon size={12} />
+                        <span>PDF</span>
+                      </button>
+
+                      {item.estado === 'PENDIENTE EVALUACIÓN' && (
+                        <>
+                          <button
+                            type="button"
+                            className="btn-gov-compact"
+                            onClick={() => handleAction(item.id, 'APROBADA')}
+                            style={{ color: '#065F46', borderColor: 'var(--ok)' }}
+                            title="Aprobar e inscribir dictamen en RUMP"
+                          >
+                            <CheckIcon size={12} />
+                            <span>Aprobar</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-gov-compact"
+                            onClick={() => handleAction(item.id, 'OBSERVADA')}
+                            style={{ color: '#991B1B', borderColor: 'var(--danger)' }}
+                            title="Devolver con observaciones técnicas"
+                          >
+                            <XIcon size={12} />
+                            <span>Observar</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {/* Modal de Previsualización Oficial de Certificado PDF */}
+        {viewingCertItem && (
+          <PdfCertificateViewerModal
+            isOpen={!!viewingCertItem}
+            certIdOrFolio={viewingCertItem.actaNumero}
+            title={`Certificado Oficial de Calibración · ${viewingCertItem.actaNumero}`}
+            metadata={{
+              estado: viewingCertItem.estado,
+              laboratorioOEC: viewingCertItem.laboratorio,
+              fechaEmision: viewingCertItem.fechaEnsayo,
+              precintoSIMEL: viewingCertItem.oec,
+            }}
+            onClose={() => setViewingCertItem(null)}
+          />
+        )}
+
+        {/* Modal para Registrar Nueva Calibración (HU-04) */}
+        {showCalibrationModal && (
+          <RegisterCalibrationModal
+            instruments={instruments}
+            onClose={() => setShowCalibrationModal(false)}
+            onSuccess={() => {
+              setShowCalibrationModal(false);
+              loadCalibraciones();
+            }}
+          />
+        )}
       </div>
     </div>
   );
 };
-

@@ -149,6 +149,8 @@ describe('🔴 RF005 & RF007 — Certificados Digitales y Calibraciones Metroló
         fechaCalibracion: '2026-01-01T00:00:00.000Z',
         fechaProximaCalibracion: '2027-01-01T00:00:00.000Z',
         resultado: ResultadoCalibracion.NO_CONFORME,
+        patronesUtilizados: [{ codigoPatron: 'PAT-01', descripcion: 'Pesa', certificadoTrazabilidad: 'CERT', fechaVencimientoPatron: '2027-01-01' }],
+        erroresMaximosPermitidos: [{ cargaNominal: 10, errorEncontrado: 0.1, errorMaximoPermitido: 0.05, cumple: false }],
       };
 
       await calibracionesService.create(createDto as any, 'tech_123');
@@ -168,6 +170,8 @@ describe('🔴 RF005 & RF007 — Certificados Digitales y Calibraciones Metroló
         fechaCalibracion: '2026-01-01T00:00:00.000Z',
         fechaProximaCalibracion: '2027-01-01T00:00:00.000Z',
         resultado: ResultadoCalibracion.CONFORME,
+        patronesUtilizados: [{ codigoPatron: 'PAT-01', descripcion: 'Pesa', certificadoTrazabilidad: 'CERT', fechaVencimientoPatron: '2027-01-01' }],
+        erroresMaximosPermitidos: [{ cargaNominal: 10, errorEncontrado: 0.02, errorMaximoPermitido: 0.05, cumple: true }],
       };
 
       await expect(calibracionesService.create(createDto as any, 'tech_123')).rejects.toThrow(
@@ -176,6 +180,7 @@ describe('🔴 RF005 & RF007 — Certificados Digitales y Calibraciones Metroló
     });
 
     it('TC-RF007-04: Rechazar si el número de certificado ya existe (409 Conflict)', async () => {
+      mockInstrumentoModel.findById = vi.fn().mockResolvedValue(mockInstrumentoDoc);
       mockCalibracionModel.findOne = vi.fn().mockResolvedValue({ numeroCertificado: 'CERT-DUPLICADO' });
 
       const createDto = {
@@ -185,6 +190,8 @@ describe('🔴 RF005 & RF007 — Certificados Digitales y Calibraciones Metroló
         fechaCalibracion: '2026-01-01T00:00:00.000Z',
         fechaProximaCalibracion: '2027-01-01T00:00:00.000Z',
         resultado: ResultadoCalibracion.CONFORME,
+        patronesUtilizados: [{ codigoPatron: 'PAT-01', descripcion: 'Pesa', certificadoTrazabilidad: 'CERT', fechaVencimientoPatron: '2027-01-01' }],
+        erroresMaximosPermitidos: [{ cargaNominal: 10, errorEncontrado: 0.02, errorMaximoPermitido: 0.05, cumple: true }],
       };
 
       await expect(calibracionesService.create(createDto as any, 'tech_123')).rejects.toThrow(
@@ -193,6 +200,7 @@ describe('🔴 RF005 & RF007 — Certificados Digitales y Calibraciones Metroló
     });
 
     it('TC-RF007-05: Rechazar si la fecha próxima de calibración es anterior o igual a la de calibración', async () => {
+      mockInstrumentoModel.findById = vi.fn().mockResolvedValue(mockInstrumentoDoc);
       const createDto = {
         instrumentoId: '60d0fe4f5311236168a109aa',
         laboratorioAcreditado: 'ONAC-LAB-01',
@@ -200,6 +208,8 @@ describe('🔴 RF005 & RF007 — Certificados Digitales y Calibraciones Metroló
         fechaCalibracion: '2026-06-01T00:00:00.000Z',
         fechaProximaCalibracion: '2026-01-01T00:00:00.000Z', // Anterior
         resultado: ResultadoCalibracion.CONFORME,
+        patronesUtilizados: [{ codigoPatron: 'PAT-01', descripcion: 'Pesa', certificadoTrazabilidad: 'CERT', fechaVencimientoPatron: '2027-01-01' }],
+        erroresMaximosPermitidos: [{ cargaNominal: 10, errorEncontrado: 0.02, errorMaximoPermitido: 0.05, cumple: true }],
       };
 
       await expect(calibracionesService.create(createDto as any, 'tech_123')).rejects.toThrow(

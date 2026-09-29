@@ -2,6 +2,7 @@ import React from 'react';
 import type { ActiveScreen } from '../../types/metrology';
 import { UserCheckIcon, ShieldCheckIcon } from './Icons';
 import { useAuth } from '../../context/AuthContext';
+import { toast } from 'sonner';
 
 interface BrandHeaderProps {
   activeScreen: ActiveScreen;
@@ -10,6 +11,21 @@ interface BrandHeaderProps {
 
 export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNavigate }) => {
   const { user, isAuthenticated, logout } = useAuth();
+
+  const handleNavigate = (screen: ActiveScreen) => {
+    // Verificación de RBAC en frontend para feedback inmediato
+    if (screen === 'administracion') {
+      if (!user || user.rol !== 'ADMIN') {
+        toast.error(
+          `🛑 Acceso Denegado (403): La Consola de Administración requiere rol ADMINISTRADOR. Su rol actual es [${user?.rol || 'ANÓNIMO'}].`
+        );
+        return;
+      }
+    }
+
+    onNavigate(screen);
+  };
+
   return (
     <header
       style={{
@@ -103,7 +119,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
                 marginTop: '1px',
               }}
             >
-              Plataforma Oficial de Consulta de Metrología Legal en Colombia | SIC
+              Plataforma Oficial de Metrología Legal en Colombia | SIC
             </p>
           </div>
         </div>
@@ -121,7 +137,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
         >
           <button
             type="button"
-            onClick={() => onNavigate('auditoria')}
+            onClick={() => handleNavigate('auditoria')}
             className="microlabel"
             style={{
               height: '72px',
@@ -140,7 +156,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
 
           <button
             type="button"
-            onClick={() => onNavigate('instrumentos')}
+            onClick={() => handleNavigate('instrumentos')}
             className="microlabel"
             style={{
               height: '72px',
@@ -159,7 +175,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
 
           <button
             type="button"
-            onClick={() => onNavigate('validaciones')}
+            onClick={() => handleNavigate('validaciones')}
             className="microlabel"
             style={{
               height: '72px',
@@ -178,7 +194,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
 
           <button
             type="button"
-            onClick={() => onNavigate('administracion')}
+            onClick={() => handleNavigate('administracion')}
             className="microlabel"
             style={{
               height: '72px',
@@ -193,6 +209,27 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
             }}
           >
             Administración del Sistema
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleNavigate('consulta-publica')}
+            className="microlabel"
+            style={{
+              height: '72px',
+              padding: '0 16px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: activeScreen === 'consulta-publica' ? 'var(--navy-900)' : 'transparent',
+              color: activeScreen === 'consulta-publica' ? '#FFFFFF' : 'var(--blue-600)',
+              fontWeight: 700,
+              transition: 'background-color 0.15s ease',
+              borderBottom: activeScreen === 'consulta-publica' ? '3px solid var(--blue-600)' : '3px solid transparent',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <span>🔍 Consulta Pública (QR)</span>
           </button>
         </nav>
 
@@ -241,11 +278,12 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
                     className="microlabel-sm font-mono"
                     style={{
                       fontSize: '9px',
-                      color: 'var(--blue-600)',
+                      color: user.rol === 'ADMIN' ? '#7C3AED' : user.rol === 'TECNICO' ? 'var(--blue-600)' : '#B45309',
+                      fontWeight: 800,
                       marginTop: '1px',
                     }}
                   >
-                    ROL: {user.rol} {user.cargo ? `· ${user.cargo}` : ''}
+                    ROL: {user.rol}
                   </div>
                 </div>
               </div>
@@ -278,4 +316,3 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
     </header>
   );
 };
-

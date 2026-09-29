@@ -1,0 +1,28 @@
+# ==============================================================================
+# WEIGHTCONTROL · REGLAS DE DESARROLLO Y AUDITORÍA PARA AGENTES DE IA (SICM-COL)
+# ==============================================================================
+
+## 1. PRINCIPIO METROLÓGICO (NTC 2031 / OIML R 76-1)
+- Las fórmulas metrológicas son inalterables:
+  * Escalones de verificación: $n = \text{round}(\text{Max} / e)$
+  * Clase I: $n \ge 50.000$
+  * Clase II: $100 \le n \le 100.000$
+  * Clase III: $500 \le n \le 10.000$
+  * Clase IIII: $100 \le n \le 1.000$
+- Toda báscula o instrumento debe exigir estrictamente: `capacidadMinima < capacidadMaxima` y `capacidadMaxima > 0`.
+
+## 2. GARANTÍA DE PRIVACIDAD Y HABEAS DATA (Ley 1581 de 2012)
+- En cualquier endpoint público marcado con `@Public()` o vista accesible sin login:
+  * PROHIBIDO exponer: `nombreRazonSocial`, `nitRut`, `cedula`, `telefono`, `correo`, `direccion`, `latitud`/`longitud` privada del propietario o `idOperario`.
+  * PERMITIDO exponer: `serial`, `marca`, `modelo`, `categoriaExactitud`, `estadoMetrologico`, `esVigente`, `fechaProximaCalibracion`, `codigoPrecintoSIMEL` y URL de descarga del certificado.
+- Si el serial o certificado no existe, no coincide o fue adulterado, la respuesta DEBE contener explícitamente el texto `"certificado no verificable"`.
+
+## 3. INMUTABILIDAD DE CERTIFICADOS Y SELLOS DIGITALES
+- Los certificados emitidos con firma digital (`bloqueadoInmutable: true`) NO pueden ser editados, mutados ni eliminados por peticiones `PATCH`, `PUT` o `DELETE`.
+- Cualquier modificación sobre un registro sellado debe responder con `400 Bad Request` o `403 Forbidden` y requerir un proceso de anulación / nueva calibración con trazabilidad forense.
+
+## 4. CONTROL DE ACCESO BASADO EN ROLES (RBAC)
+- Endpoints administrativos (`/api/usuarios`, inactivación de usuarios): Exigen rol `ADMIN`.
+- Endpoints de registro y calibración: Exigen rol `ADMIN` o `TECNICO`.
+- Rol `AUDITOR`: Acceso exclusivo de solo lectura y generación de reportes forenses.
+- Todo acceso no autorizado debe responder `403 Forbidden` y registrarse en la colección `audit_logs` con `userId`, `ip`, `recurso` y `timestamp`.

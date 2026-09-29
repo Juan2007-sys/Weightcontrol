@@ -6,6 +6,7 @@ import {
   IsOptional,
   IsPositive,
   IsString,
+  Min,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
@@ -15,6 +16,20 @@ import {
   UnidadMedida,
 } from '../../../schemas/instrumento.schema.js';
 import { PropietarioDto } from './propietario.dto.js';
+
+export class EvidenciasFotograficasDto {
+  @IsString({ message: 'La fotografía del equipo debe ser una cadena o URL no vacía.' })
+  @IsNotEmpty({ message: 'La evidencia fotográfica del equipo es obligatoria.' })
+  fotoEquipo: string;
+
+  @IsString({ message: 'La fotografía del precinto debe ser una cadena o URL no vacía.' })
+  @IsNotEmpty({ message: 'La evidencia fotográfica del precinto es obligatoria.' })
+  fotoPrecinto: string;
+
+  @IsString({ message: 'La fotografía de la ubicación física debe ser una cadena o URL no vacía.' })
+  @IsNotEmpty({ message: 'La evidencia fotográfica de la ubicación física es obligatoria.' })
+  fotoUbicacion: string;
+}
 
 export class CreateInstrumentoDto {
   @IsString({ message: 'El serial debe ser una cadena de texto.' })
@@ -46,16 +61,26 @@ export class CreateInstrumentoDto {
   @IsNotEmpty({ message: 'La capacidad máxima es requerida.' })
   capacidadMaxima: number;
 
+  @IsNumber({}, { message: 'La capacidad mínima debe ser un valor numérico.' })
+  @Min(0, { message: 'La capacidad mínima no puede ser un número negativo.' })
+  @IsNotEmpty({ message: 'La capacidad mínima es requerida.' })
+  capacidadMinima: number;
+
   @IsEnum(UnidadMedida, {
     message: `La unidad de medida debe ser una de: ${Object.values(UnidadMedida).join(', ')}`,
   })
   @IsNotEmpty({ message: 'La unidad de medida es requerida.' })
   unidadMedida: UnidadMedida;
 
-  @IsOptional()
   @IsNumber({}, { message: 'La división de escala debe ser un valor numérico.' })
   @IsPositive({ message: 'La división de escala debe ser mayor a 0.' })
-  divisionEscala?: number;
+  @IsNotEmpty({ message: 'La división de escala (d o e) es obligatoria.' })
+  divisionEscala: number;
+
+  @ValidateNested()
+  @Type(() => EvidenciasFotograficasDto)
+  @IsNotEmpty({ message: 'El registro de evidencias fotográficas (equipo, precinto y ubicación) es obligatorio.' })
+  evidenciasFotograficas: EvidenciasFotograficasDto;
 
   @IsOptional()
   @IsString({ message: 'El código de precinto SIMEL debe ser una cadena de texto.' })

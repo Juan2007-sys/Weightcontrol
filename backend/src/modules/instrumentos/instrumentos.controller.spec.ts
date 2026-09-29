@@ -55,6 +55,7 @@ describe('InstrumentosController', () => {
       delete: vi.fn().mockResolvedValue({ message: 'Eliminado', id: '60d0fe4f5311236168a109aa' }),
       findById: vi.fn().mockResolvedValue(mockInstrumento),
       findBySerial: vi.fn().mockResolvedValue(mockInstrumento),
+      verifyPublic: vi.fn().mockResolvedValue(mockInstrumento),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -108,10 +109,11 @@ describe('InstrumentosController', () => {
   it('debe buscar públicamente por serial (publicSearch y findBySerial)', async () => {
     const pub = await controller.publicSearch('BASC-001');
     expect(pub).toEqual(mockInstrumento);
-    expect(mockService.findBySerial).toHaveBeenCalledWith('BASC-001');
+    expect(mockService.verifyPublic).toHaveBeenCalledWith('BASC-001');
 
     const bySerial = await controller.findBySerial('BASC-001');
     expect(bySerial).toEqual(mockInstrumento);
+    expect(mockService.verifyPublic).toHaveBeenCalledWith('BASC-001');
   });
 
   it('debe actualizar un instrumento', async () => {

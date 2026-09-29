@@ -4,6 +4,7 @@ import {
   UnidadMedida,
   EstadoInstrumento,
   PropietarioInfo,
+  EvidenciasFotograficas,
 } from '../../../schemas/instrumento.schema.js';
 
 export interface InstrumentoResponseDto {
@@ -14,11 +15,13 @@ export interface InstrumentoResponseDto {
   tipo: TipoInstrumento;
   categoriaExactitud: CategoriaExactitud;
   capacidadMaxima: number;
+  capacidadMinima: number;
   unidadMedida: UnidadMedida;
-  divisionEscala?: number;
+  divisionEscala: number;
   numeroDivisionesVerificacion?: number;
   codigoPrecintoSIMEL?: string;
   propietario?: PropietarioInfo;
+  evidenciasFotograficas?: EvidenciasFotograficas;
   ubicacionFisica?: string;
   fechaUltimaCalibracion: Date;
   fechaProximaCalibracion: Date;

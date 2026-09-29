@@ -3,22 +3,28 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, isValidObjectId } from 'mongoose';
 import {
   Calibracion,
   CalibracionDocument,
   Instrumento,
   InstrumentoDocument,
+  Certificado,
+  CertificadoDocument,
   EstadoInstrumento,
   ResultadoCalibracion,
   TipoAccionAuditoria,
   EntidadAfectada,
+  EstadoCertificado,
 } from '../../schemas/index.js';
 import { AuditService } from '../audit/audit.service.js';
 import { InstrumentosService } from '../instrumentos/instrumentos.service.js';
+import { PdfGeneratorService } from './pdf-generator.service.js';
 import { CreateCalibracionDto } from './dto/create-calibracion.dto.js';
 import { UpdateCalibracionDto } from './dto/update-calibracion.dto.js';
 import { QueryCalibracionesDto } from './dto/query-calibraciones.dto.js';
@@ -36,6 +42,10 @@ export class CalibracionesService {
     private readonly instrumentoModel: Model<InstrumentoDocument>,
     private readonly instrumentosService: InstrumentosService,
     private readonly auditService: AuditService,
+    private readonly pdfGeneratorService: PdfGeneratorService,
+    @Optional()
+    @InjectModel(Certificado.name)
+    private readonly certificadoModel?: Model<CertificadoDocument>,
   ) {}
 
   async create(
@@ -47,6 +57,19 @@ export class CalibracionesService {
     const instrumento = await this.instrumentoModel.findById(createDto.instrumentoId);
     if (!instrumento) {
       throw new NotFoundException(`Instrumento con ID '${createDto.instrumentoId}' no encontrado.`);
+    }
+
+    // 1. Validación de completitud (HU-04 Criterio 4)
+    if (!createDto.patronesUtilizados || createDto.patronesUtilizados.length === 0) {
+      throw new BadRequestException(
+        'Calibración incompleta: Debe declarar al menos 1 patrón de calibración trazable para emitir el certificado.',
+      );
+    }
+
+    if (!createDto.erroresMaximosPermitidos || createDto.erroresMaximosPermitidos.length === 0) {
+      throw new BadRequestException(
+        'Calibración incompleta: Debe registrar al menos 1 punto de medición de ensayo de error contra el EMP.',
+      );
     }
 
     const fechaCal = new Date(createDto.fechaCalibracion);
@@ -68,16 +91,40 @@ export class CalibracionesService {
       );
     }
 
+    const codigoFolio = `CERT-FOLIO-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const nuevaCalibracion = new this.calibracionModel({
       ...createDto,
       numeroCertificado: numCertificadoNormalizado,
+      codigoFolio,
+      bloqueadoInmutable: true, // Sello de inmutabilidad tras su emisión
       instrumento: instrumento._id,
       tecnico: tecnicoId,
       fechaCalibracion: fechaCal,
       fechaProximaCalibracion: fechaProx,
+      pdfUrl: `/api/calibraciones/${numCertificadoNormalizado}/pdf`,
     });
 
     const guardada = await nuevaCalibracion.save();
+
+    // Crear registro en la colección de Certificados si el modelo está disponible
+    if (this.certificadoModel) {
+      try {
+        const certDoc = new this.certificadoModel({
+          codigoFolio,
+          instrumento: instrumento._id,
+          calibracion: guardada._id,
+          emitidoPor: tecnicoId,
+          fechaEmision: fechaCal,
+          fechaVencimiento: fechaProx,
+          estado: createDto.resultado === ResultadoCalibracion.CONFORME ? EstadoCertificado.VALIDO : EstadoCertificado.ANULADO,
+          pdfUrl: `/api/calibraciones/${guardada._id}/pdf`,
+        });
+        await certDoc.save();
+      } catch (certErr) {
+        this.logger.warn(`Error al guardar certificado espejo: ${certErr}`);
+      }
+    }
 
     // Actualización automática y encadenada del estado del Instrumento (Regla Metrológica)
     if (createDto.resultado === ResultadoCalibracion.CONFORME) {
@@ -103,13 +150,15 @@ export class CalibracionesService {
       newState: {
         calibracionId: guardada._id.toString(),
         numeroCertificado: guardada.numeroCertificado,
+        codigoFolio,
         instrumentoSerial: instrumento.serial,
         resultado: guardada.resultado,
         nuevoEstadoInstrumento: instrumento.estado,
+        bloqueadoInmutable: true,
       },
       ipAddress,
       userAgent,
-      descripcion: `Registro de informe de calibración ${guardada.numeroCertificado} para instrumento ${instrumento.serial} con resultado ${guardada.resultado}`,
+      descripcion: `Emisión de certificado inmutable de calibración ${guardada.numeroCertificado} para instrumento ${instrumento.serial} con resultado ${guardada.resultado}`,
     });
 
     return this.findById(guardada._id.toString());
@@ -218,6 +267,12 @@ export class CalibracionesService {
       throw new NotFoundException(`Calibración con ID '${id}' no encontrada.`);
     }
 
+    if (calibracion.bloqueadoInmutable) {
+      throw new ForbiddenException(
+        'Este certificado de calibración se encuentra sellado e inmutable. No se permiten modificaciones posteriores a su emisión.',
+      );
+    }
+
     const previousState = calibracion.toObject();
 
     if (updateDto.numeroCertificado) {
@@ -292,6 +347,12 @@ export class CalibracionesService {
       throw new NotFoundException(`Calibración con ID '${id}' no encontrada.`);
     }
 
+    if (calibracion.bloqueadoInmutable) {
+      throw new ForbiddenException(
+        'Este certificado de calibración se encuentra sellado e inmutable. No se permite la eliminación de registros certificados.',
+      );
+    }
+
     const previousState = calibracion.toObject();
     await this.calibracionModel.findByIdAndDelete(id);
 
@@ -311,6 +372,69 @@ export class CalibracionesService {
       message: `Calibración con certificado '${calibracion.numeroCertificado}' eliminada exitosamente.`,
       id,
     };
+  }
+
+  async generatePdf(idOrNumCertificado: string): Promise<Buffer> {
+    let calibracion: any = null;
+    if (isValidObjectId(idOrNumCertificado)) {
+      calibracion = await this.calibracionModel
+        .findById(idOrNumCertificado)
+        .populate('instrumento')
+        .populate('tecnico');
+    }
+    if (!calibracion) {
+      calibracion = await this.calibracionModel
+        .findOne({
+          $or: [
+            { numeroCertificado: idOrNumCertificado },
+            { codigoFolio: idOrNumCertificado },
+          ],
+        })
+        .populate('instrumento')
+        .populate('tecnico');
+    }
+
+    if (!calibracion) {
+      throw new NotFoundException(`Certificado de calibración '${idOrNumCertificado}' no encontrado.`);
+    }
+
+    const instrumento = calibracion.instrumento as any;
+    const tecnico = calibracion.tecnico as any;
+
+    return await this.pdfGeneratorService.generateCertificadoPdf({
+      numeroCertificado: calibracion.numeroCertificado,
+      codigoFolio: calibracion.codigoFolio || `FOLIO-${calibracion._id}`,
+      fechaEmision: calibracion.fechaCalibracion,
+      fechaVencimiento: calibracion.fechaProximaCalibracion,
+      laboratorioAcreditado: calibracion.laboratorioAcreditado || 'Laboratorio Metrológico Autorizado',
+      tecnicoNombre: tecnico?.nombre || 'Técnico Metrólogo',
+      instrumento: {
+        serial: instrumento?.serial || 'N/A',
+        marca: instrumento?.marca || 'N/A',
+        modelo: instrumento?.modelo || 'N/A',
+        tipo: instrumento?.tipo || 'BASCULA_COMERCIAL',
+        categoriaExactitud: instrumento?.categoriaExactitud || 'CLASE_III',
+        capacidadMaxima: instrumento?.capacidadMaxima || 0,
+        capacidadMinima: instrumento?.capacidadMinima || 0,
+        unidadMedida: instrumento?.unidadMedida || 'kg',
+        divisionEscala: instrumento?.divisionEscala,
+        codigoPrecintoSIMEL: calibracion.codigoPrecintoSIMEL || instrumento?.codigoPrecintoSIMEL,
+      },
+      resultado: calibracion.resultado,
+      patronesUtilizados: (calibracion.patronesUtilizados || []).map((p: any) => ({
+        codigoPatron: p.codigoPatron,
+        descripcion: p.descripcion,
+        certificadoTrazabilidad: p.certificadoTrazabilidad,
+        fechaVencimientoPatron: p.fechaVencimientoPatron,
+      })),
+      erroresMaximosPermitidos: (calibracion.erroresMaximosPermitidos || []).map((e: any) => ({
+        cargaNominal: e.cargaNominal,
+        errorEncontrado: e.errorEncontrado,
+        errorMaximoPermitido: e.errorMaximoPermitido,
+        cumple: e.cumple,
+      })),
+      verificationUrl: `https://weightcontrol.gov.co/verificar?serial=${encodeURIComponent(instrumento?.serial || '')}&cert=${encodeURIComponent(calibracion.numeroCertificado)}`,
+    });
   }
 
   private mapToResponse(doc: CalibracionDocument): CalibracionResponseDto {

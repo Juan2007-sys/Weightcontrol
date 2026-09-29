@@ -33,6 +33,18 @@ export enum UnidadMedida {
 }
 
 @Schema({ _id: false })
+export class EvidenciasFotograficas {
+  @Prop({ required: true, trim: true })
+  fotoEquipo: string;
+
+  @Prop({ required: true, trim: true })
+  fotoPrecinto: string;
+
+  @Prop({ required: true, trim: true })
+  fotoUbicacion: string;
+}
+
+@Schema({ _id: false })
 export class PropietarioInfo {
   @Prop({ required: true, trim: true })
   nombreRazonSocial: string;
@@ -79,6 +91,9 @@ export class Instrumento {
   @Prop({ required: true, min: 0.000001 })
   capacidadMaxima: number; // Max > 0
 
+  @Prop({ required: true, min: 0 })
+  capacidadMinima: number; // Min >= 0 y Min < Max
+
   @Prop({
     type: String,
     required: true,
@@ -87,8 +102,8 @@ export class Instrumento {
   })
   unidadMedida: UnidadMedida;
 
-  @Prop({ min: 0 })
-  divisionEscala?: number; // d o e
+  @Prop({ required: true, min: 0.000001 })
+  divisionEscala: number; // d o e
 
   @Prop({ min: 0 })
   numeroDivisionesVerificacion?: number; // n = Max / e
@@ -98,6 +113,9 @@ export class Instrumento {
 
   @Prop({ type: PropietarioInfo })
   propietario?: PropietarioInfo;
+
+  @Prop({ type: EvidenciasFotograficas, required: true })
+  evidenciasFotograficas: EvidenciasFotograficas;
 
   @Prop({ trim: true })
   ubicacionFisica?: string;

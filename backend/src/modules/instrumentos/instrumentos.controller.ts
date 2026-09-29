@@ -28,6 +28,8 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { RolUsuario } from '../../schemas/usuario.schema.js';
 
+import { PublicVerificationDto } from './dto/public-verification.dto.js';
+
 @Controller('instrumentos')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class InstrumentosController {
@@ -62,16 +64,24 @@ export class InstrumentosController {
   @Get('public/search')
   async publicSearch(
     @Query('serial') serial: string,
-  ): Promise<InstrumentoResponseDto> {
-    return this.instrumentosService.findBySerial(serial);
+  ): Promise<PublicVerificationDto> {
+    return this.instrumentosService.verifyPublic(serial);
+  }
+
+  @Public()
+  @Get('public/verificar/:serial')
+  async publicVerify(
+    @Param('serial') serial: string,
+  ): Promise<PublicVerificationDto> {
+    return this.instrumentosService.verifyPublic(serial);
   }
 
   @Public()
   @Get('serial/:serial')
   async findBySerial(
     @Param('serial') serial: string,
-  ): Promise<InstrumentoResponseDto> {
-    return this.instrumentosService.findBySerial(serial);
+  ): Promise<PublicVerificationDto> {
+    return this.instrumentosService.verifyPublic(serial);
   }
 
   @Get(':id')

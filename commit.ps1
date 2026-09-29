@@ -1,22 +1,35 @@
-﻿# ==============================================================================
+# ==============================================================================
 # Script de Commit Rapido e Interactivo para PowerShell (Windows)
 # ==============================================================================
 
 param(
-    [Parameter(Position=0)]
-    [string]$Message = ""
+    [Alias("msg")]
+    [string]$m = "",
+
+    [Parameter(Position=0, ValueFromRemainingArguments=$true)]
+    [string[]]$Message
 )
 
-Write-Host "==============================================" -ForegroundColor Cyan
-Write-Host "   🚀 Asistente de Commits - Weightcontrol   " -ForegroundColor Green
-Write-Host "==============================================" -ForegroundColor Cyan
+$commitMessage = if (-not [string]::IsNullOrWhiteSpace($m)) {
+    $m.Trim()
+} elseif ($Message) {
+    ($Message -join " ").Trim()
+} else {
+    ""
+}
 
-# 1. Verificar si es un repositorio Git
-git rev-parse --is-inside-work-tree 2>$null | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "`n❌ Error: Este directorio no es un repositorio de Git." -ForegroundColor Red
+# 1. Verificar y ubicarse en la raiz del repositorio Git
+$gitRoot = (git rev-parse --show-toplevel 2>$null)
+if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($gitRoot)) {
+    Write-Host ""
+    Write-Host "[ERROR] Este directorio no es un repositorio de Git." -ForegroundColor Red
     exit 1
 }
+Set-Location $gitRoot
+
+Write-Host "==============================================" -ForegroundColor Cyan
+Write-Host "   Asistente de Commits - WeightControl       " -ForegroundColor Green
+Write-Host "==============================================" -ForegroundColor Cyan
 
 # 2. Informacion de usuario y rama
 $authorName = (git config user.name)
@@ -25,29 +38,30 @@ $branch = (git branch --show-current)
 if ([string]::IsNullOrWhiteSpace($branch)) { $branch = "main" }
 
 if (-not [string]::IsNullOrWhiteSpace($authorName)) {
-    Write-Host "👤 Autor: $authorName <$authorEmail>" -ForegroundColor DarkGray
+    Write-Host "Autor: $authorName <$authorEmail>" -ForegroundColor DarkGray
 }
-Write-Host "🌿 Rama:  $branch" -ForegroundColor DarkCyan
+Write-Host "Rama:  $branch" -ForegroundColor DarkCyan
 
 # 3. Mostrar estado actual de archivos
-Write-Host "`n📋 Estado actual de los archivos:" -ForegroundColor Yellow
+Write-Host ""
+Write-Host "[ESTADO] Archivos pendientes:" -ForegroundColor Yellow
 git status -s
 
 $gitStatus = git status --porcelain
 if (-not $gitStatus -or [string]::IsNullOrWhiteSpace("$gitStatus")) {
-    Write-Host "✔ Todos tus archivos (backend y frontend) ya están guardados en commits locales." -ForegroundColor Green
-    
     Write-Host ""
-    $pushExisting = Read-Host " ¿Deseas subir (push) los commits existentes a GitHub ($branch)? [S/n]"
+    Write-Host "[OK] Todos tus archivos ya estan guardados en commits locales." -ForegroundColor Green
+    Write-Host ""
+    $pushExisting = Read-Host "Deseas subir (push) los commits existentes a GitHub ($branch)? [S/n]"
     if ([string]::IsNullOrWhiteSpace($pushExisting)) { $pushExisting = "S" }
     
     if ($pushExisting -match "^[Ss]$") {
         Write-Host "`nSubiendo cambios a origin/$branch..." -ForegroundColor Yellow
         git push -u origin "$branch"
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "`n✔ ¡Subida completada con éxito a GitHub! 🚀" -ForegroundColor Green
+            Write-Host "`n[OK] Subida completada con exito a GitHub!" -ForegroundColor Green
         } else {
-            Write-Host "`n⚠ Hubo un detalle al hacer push. Revisa la autenticación con tu cuenta de GitHub." -ForegroundColor Red
+            Write-Host "`n[ALERTA] Hubo un detalle al hacer push. Revisa la autenticacion con tu cuenta de GitHub." -ForegroundColor Red
         }
     }
     Write-Host "==============================================`n" -ForegroundColor Cyan
@@ -56,32 +70,39 @@ if (-not $gitStatus -or [string]::IsNullOrWhiteSpace("$gitStatus")) {
 
 # 4. Preguntar si desea agregar todos los cambios (git add .)
 Write-Host ""
-$addAll = Read-Host " ¿Deseas agregar todos los archivos nuevos/modificados (git add .) ? [S/n]"
-if ([string]::IsNullOrWhiteSpace($addAll)) { $addAll = "S" }
-
-if ($addAll -match "^[Ss]$") {
+if (-not [string]::IsNullOrWhiteSpace($commitMessage)) {
+    # Modo rapido directo si se paso mensaje
     git add .
-    Write-Host "✔ Archivos agregados al área de preparación (stage)." -ForegroundColor Green
+    Write-Host "[OK] Archivos agregados al area de preparacion (stage)." -ForegroundColor Green
 } else {
-    Write-Host "ℹ Agrega manualmente los archivos con 'git add <archivo>' y vuelve a ejecutar el script." -ForegroundColor Yellow
-    exit 0
+    $addAll = Read-Host "Deseas agregar todos los archivos nuevos/modificados (git add .) ? [S/n]"
+    if ([string]::IsNullOrWhiteSpace($addAll)) { $addAll = "S" }
+
+    if ($addAll -match "^[Ss]$") {
+        git add .
+        Write-Host "[OK] Archivos agregados al area de preparacion (stage)." -ForegroundColor Green
+    } else {
+        Write-Host "[INFO] Agrega manualmente los archivos con 'git add <archivo>' y vuelve a ejecutar el script." -ForegroundColor Yellow
+        exit 0
+    }
 }
 
 # 5. Construir el mensaje del commit
-if (-not [string]::IsNullOrWhiteSpace($Message)) {
-    $commitMsg = $Message
+if (-not [string]::IsNullOrWhiteSpace($commitMessage)) {
+    $commitMsg = $commitMessage
 } else {
-    Write-Host "`n📌 Selecciona el tipo de cambio:" -ForegroundColor Magenta
-    Write-Host "  1) feat     - Nueva característica o funcionalidad" -ForegroundColor Green
-    Write-Host "  2) fix      - Corrección de un bug o error" -ForegroundColor Red
-    Write-Host "  3) docs     - Cambios en la documentación (README, etc.)" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Selecciona el tipo de cambio:" -ForegroundColor Magenta
+    Write-Host "  1) feat     - Nueva caracteristica o funcionalidad" -ForegroundColor Green
+    Write-Host "  2) fix      - Correccion de un bug o error" -ForegroundColor Red
+    Write-Host "  3) docs     - Cambios en la documentacion (README, etc.)" -ForegroundColor Cyan
     Write-Host "  4) style    - Estilos, formateo, espaciados" -ForegroundColor Yellow
-    Write-Host "  5) refactor - Refactorización de código" -ForegroundColor Magenta
-    Write-Host "  6) test     - Añadir o corregir pruebas unitarias o e2e" -ForegroundColor Cyan
+    Write-Host "  5) refactor - Refactorizacion de codigo" -ForegroundColor Magenta
+    Write-Host "  6) test     - Anadir o corregir pruebas unitarias o e2e" -ForegroundColor Cyan
     Write-Host "  7) chore    - Mantenimiento, dependencias, configuraciones" -ForegroundColor Yellow
-    Write-Host "  8) ✍ Personalizado (escribir mensaje directo)"
+    Write-Host "  8) Personalizado (escribir mensaje directo)"
 
-    $opt = Read-Host " Elige una opción [1-8]"
+    $opt = Read-Host "Elige una opcion [1-8]"
 
     $type = switch ($opt) {
         "1" { "feat" }
@@ -96,12 +117,12 @@ if (-not [string]::IsNullOrWhiteSpace($Message)) {
 
     if ($type -ne "") {
         Write-Host ""
-        $scope = Read-Host " Alcance / Módulo opcional (ej. backend, frontend, auth) [Enter para omitir]"
-        $desc = Read-Host " Descripción del commit (breve y clara)"
+        $scope = Read-Host "Alcance / Modulo opcional (ej. backend, frontend, calibraciones) [Enter para omitir]"
+        $desc = Read-Host "Descripcion del commit (breve y clara)"
 
         while ([string]::IsNullOrWhiteSpace($desc)) {
-            Write-Host "⚠ La descripción no puede estar vacía." -ForegroundColor Red
-            $desc = Read-Host " Descripción del commit"
+            Write-Host "[ALERTA] La descripcion no puede estar vacia." -ForegroundColor Red
+            $desc = Read-Host "Descripcion del commit"
         }
 
         if (-not [string]::IsNullOrWhiteSpace($scope)) {
@@ -111,47 +132,54 @@ if (-not [string]::IsNullOrWhiteSpace($Message)) {
         }
     } else {
         Write-Host ""
-        $commitMsg = Read-Host " Escribe el mensaje completo del commit"
+        $commitMsg = Read-Host "Escribe el mensaje completo del commit"
         while ([string]::IsNullOrWhiteSpace($commitMsg)) {
-            Write-Host "⚠ El mensaje no puede estar vacío." -ForegroundColor Red
-            $commitMsg = Read-Host " Escribe el mensaje completo del commit"
+            Write-Host "[ALERTA] El mensaje no puede estar vacio." -ForegroundColor Red
+            $commitMsg = Read-Host "Escribe el mensaje completo del commit"
         }
     }
 }
 
 # 6. Ejecutar commit
-Write-Host "`n💬 Mensaje del commit: `"$commitMsg`"" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Mensaje del commit: `"$commitMsg`"" -ForegroundColor Cyan
 git commit -m "$commitMsg"
 
 if ($LASTEXITCODE -eq 0) {
-    Write-Host "`n✔ ¡Commit realizado con éxito! 🎉" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "[OK] Commit realizado con exito!" -ForegroundColor Green
 } else {
-    Write-Host "`n❌ Ocurrió un error al realizar el commit." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "[ERROR] Ocurrio un error al realizar el commit." -ForegroundColor Red
     exit 1
 }
 
 # 7. Preguntar si desea hacer push al repositorio remoto de GitHub
 Write-Host ""
-$doPush = Read-Host " ¿Deseas hacer push a GitHub ($branch)? [S/n]"
+$doPush = Read-Host "Deseas hacer push a GitHub ($branch)? [S/n]"
 if ([string]::IsNullOrWhiteSpace($doPush)) { $doPush = "S" }
 
 if ($doPush -match "^[Ss]$") {
     $originUrl = git remote get-url origin 2>$null
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($originUrl)) {
-        Write-Host "⚠ No tienes un repositorio remoto configurado como 'origin'." -ForegroundColor Yellow
-        Write-Host "Configúralo con: git remote add origin https://github.com/Juan2007-sys/Weightcontrol.git" -ForegroundColor Cyan
+        Write-Host "[ALERTA] No tienes un repositorio remoto configurado como 'origin'." -ForegroundColor Yellow
+        Write-Host "Configuralo con: git remote add origin https://github.com/Juan2007-sys/Weightcontrol.git" -ForegroundColor Cyan
         exit 1
     }
 
-    Write-Host "`nSubiendo cambios a origin/$branch..." -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "Subiendo cambios a origin/$branch..." -ForegroundColor Yellow
     
     git push -u origin "$branch"
     
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "`n✔ ¡Subida completada con éxito a GitHub! 🚀" -ForegroundColor Green
+        Write-Host ""
+        Write-Host "[OK] Subida completada con exito a GitHub!" -ForegroundColor Green
     } else {
-        Write-Host "`n⚠ No se pudo hacer push automáticamente." -ForegroundColor Red
+        Write-Host ""
+        Write-Host "[ALERTA] No se pudo hacer push automaticamente. Revisa tus credenciales de git." -ForegroundColor Red
     }
 }
 
-Write-Host "`n==============================================" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "==============================================" -ForegroundColor Cyan

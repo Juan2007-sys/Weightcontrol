@@ -19,6 +19,17 @@ export class PesaValidator implements InstrumentoValidator {
       errors.push('El valor nominal / capacidad de la pesa patrón debe ser mayor a 0.');
     }
 
+    if (data.capacidadMinima !== undefined && data.capacidadMinima !== null && data.capacidadMaxima !== undefined) {
+      if (data.capacidadMinima < 0) {
+        errors.push('La capacidad mínima (Min) no puede ser un valor negativo.');
+      }
+      if (data.capacidadMinima >= data.capacidadMaxima) {
+        errors.push(
+          `Inconsistencia de capacidades: La capacidad mínima (${data.capacidadMinima}) debe ser estrictamente menor a la capacidad máxima (${data.capacidadMaxima}).`,
+        );
+      }
+    }
+
     if (new Date(data.fechaProximaCalibracion) <= new Date(data.fechaUltimaCalibracion)) {
       errors.push('La fecha de próxima calibración debe ser estrictamente posterior a la fecha de última calibración.');
     }

@@ -12,10 +12,16 @@ export interface InstrumentoValidationData {
   tipo: TipoInstrumento;
   categoriaExactitud: CategoriaExactitud;
   capacidadMaxima: number;
+  capacidadMinima?: number;
   unidadMedida: string;
   divisionEscala?: number;
   numeroDivisionesVerificacion?: number;
   codigoPrecintoSIMEL?: string;
+  evidenciasFotograficas?: {
+    fotoEquipo?: string;
+    fotoPrecinto?: string;
+    fotoUbicacion?: string;
+  };
   fechaUltimaCalibracion: Date;
   fechaProximaCalibracion: Date;
 }

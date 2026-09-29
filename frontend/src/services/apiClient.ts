@@ -130,4 +130,41 @@ export const apiClient = {
 
   delete: <T>(endpoint: string, options?: RequestOptions) =>
     request<T>(endpoint, { method: 'DELETE', ...options }),
+
+  getBlob: async (endpoint: string, params?: Record<string, any>, options?: RequestOptions): Promise<Blob> => {
+    let url = `${API_BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
+    if (params) {
+      const searchParams = new URLSearchParams();
+      Object.entries(params).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          searchParams.append(key, String(val));
+        }
+      });
+      const queryString = searchParams.toString();
+      if (queryString) {
+        url += (url.includes('?') ? '&' : '?') + queryString;
+      }
+    }
+
+    const token = getAuthToken();
+    const reqHeaders: Record<string, string> = {
+      ...(options?.headers as Record<string, string>),
+    };
+    if (token) {
+      reqHeaders['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(url, {
+      ...options,
+      method: 'GET',
+      headers: reqHeaders,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => '');
+      throw new ApiError(errorText || `Error HTTP ${response.status}`, response.status);
+    }
+
+    return response.blob();
+  },
 };

@@ -93,6 +93,12 @@ export class Calibracion {
 
   @Prop({ trim: true })
   archivoInformeUrl?: string;
+
+  @Prop({ default: true, index: true })
+  bloqueadoInmutable: boolean;
+
+  @Prop({ trim: true, index: true })
+  codigoFolio?: string;
 }
 
 export const CalibracionSchema = SchemaFactory.createForClass(Calibracion);

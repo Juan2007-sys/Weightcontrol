@@ -1,5 +1,7 @@
 import {
+  ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsDateString,
   IsEnum,
   IsNotEmpty,
@@ -43,17 +45,19 @@ export class CreateCalibracionDto {
   @IsString({ message: 'El código de precinto SIMEL debe ser texto.' })
   codigoPrecintoSIMEL?: string;
 
-  @IsOptional()
   @IsArray({ message: 'Los patrones utilizados deben ser una lista.' })
+  @ArrayMinSize(1, { message: 'Debe declarar al menos 1 patrón de calibración trazable para validar completitud.' })
   @ValidateNested({ each: true })
   @Type(() => PatronUtilizadoDto)
-  patronesUtilizados?: PatronUtilizadoDto[];
+  @IsNotEmpty({ message: 'Los patrones de medición utilizados son obligatorios para emitir el certificado.' })
+  patronesUtilizados: PatronUtilizadoDto[];
 
-  @IsOptional()
   @IsArray({ message: 'Los errores de medición deben ser una lista.' })
+  @ArrayMinSize(1, { message: 'Debe registrar al menos 1 punto de medición de error contra el EMP.' })
   @ValidateNested({ each: true })
   @Type(() => PuntoMedicionErrorDto)
-  erroresMaximosPermitidos?: PuntoMedicionErrorDto[];
+  @IsNotEmpty({ message: 'Las lecturas y ensayos de error son obligatorios para emitir el certificado.' })
+  erroresMaximosPermitidos: PuntoMedicionErrorDto[];
 
   @IsOptional()
   @IsString({ message: 'La incertidumbre expandida debe ser texto.' })
@@ -66,4 +70,8 @@ export class CreateCalibracionDto {
   @IsOptional()
   @IsString({ message: 'La URL del informe debe ser texto.' })
   archivoInformeUrl?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  bloqueadoInmutable?: boolean;
 }

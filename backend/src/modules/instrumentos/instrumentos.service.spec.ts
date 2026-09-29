@@ -26,9 +26,22 @@ describe('InstrumentosService', () => {
     tipo: TipoInstrumento.BASCULA,
     categoriaExactitud: CategoriaExactitud.CLASE_III,
     capacidadMaxima: 50,
+    capacidadMinima: 0.2,
     unidadMedida: UnidadMedida.KG,
     divisionEscala: 0.01,
     numeroDivisionesVerificacion: 5000,
+    evidenciasFotograficas: {
+      fotoEquipo: 'https://cdn.example.com/foto-eq.jpg',
+      fotoPrecinto: 'https://cdn.example.com/foto-prec.jpg',
+      fotoUbicacion: 'https://cdn.example.com/foto-ub.jpg',
+    },
+    propietario: {
+      nombreRazonSocial: 'Supermercado Los Andes S.A.S.',
+      nitRut: '900.123.456-7',
+      direccion: 'Calle 100 # 15-20',
+      ciudad: 'Bogotá D.C.',
+      departamento: 'Cundinamarca',
+    },
     fechaUltimaCalibracion: new Date('2026-01-01'),
     fechaProximaCalibracion: new Date('2027-01-01'),
     estado: EstadoInstrumento.VIGENTE,
@@ -42,6 +55,7 @@ describe('InstrumentosService', () => {
 
   class MockInstrumentoModel {
     _id = '60d0fe4f5311236168a109aa';
+    serial = 'BASC-001';
     save = vi.fn().mockResolvedValue(this);
     toObject = vi.fn().mockReturnValue(mockInstrumentoDoc);
     constructor(dto: any) {
@@ -120,8 +134,8 @@ describe('InstrumentosService', () => {
     });
   });
 
-  describe('create', () => {
-    it('debe registrar un instrumento exitosamente y registrar auditoria', async () => {
+  describe('create (HU-01 & HU-02)', () => {
+    it('debe registrar un instrumento exitosamente con fotos y registrar auditoria', async () => {
       MockInstrumentoModel.findOne.mockResolvedValue(null);
 
       const createDto = {
@@ -131,20 +145,26 @@ describe('InstrumentosService', () => {
         tipo: TipoInstrumento.BASCULA,
         categoriaExactitud: CategoriaExactitud.CLASE_III,
         capacidadMaxima: 50,
+        capacidadMinima: 0.2,
         unidadMedida: UnidadMedida.KG,
         divisionEscala: 0.01,
+        evidenciasFotograficas: {
+          fotoEquipo: 'https://cdn.example.com/eq.jpg',
+          fotoPrecinto: 'https://cdn.example.com/prec.jpg',
+          fotoUbicacion: 'https://cdn.example.com/ub.jpg',
+        },
         fechaUltimaCalibracion: '2026-01-01T00:00:00.000Z',
         fechaProximaCalibracion: '2027-01-01T00:00:00.000Z',
       };
 
-      const result = await service.create(createDto, 'user_123', '127.0.0.1', 'Vitest');
+      const result = await service.create(createDto as any, 'user_123', '127.0.0.1', 'Vitest');
 
       expect(result).toHaveProperty('serial', 'BASC-001');
       expect(mockValidationEngine.assertValid).toHaveBeenCalled();
       expect(mockAuditService.logEvent).toHaveBeenCalled();
     });
 
-    it('debe lanzar ConflictException si el serial ya existe', async () => {
+    it('HU-02: debe lanzar ConflictException si el serial ya existe en la consulta previa', async () => {
       MockInstrumentoModel.findOne.mockResolvedValue(mockInstrumentoDoc);
 
       const createDto = {
@@ -160,7 +180,92 @@ describe('InstrumentosService', () => {
         fechaProximaCalibracion: '2027-01-01T00:00:00.000Z',
       };
 
-      await expect(service.create(createDto, 'user_123')).rejects.toThrow(ConflictException);
+      await expect(service.create(createDto as any, 'user_123')).rejects.toThrow(ConflictException);
+    });
+
+    it('HU-02: debe capturar error E11000 de MongoDB y lanzar ConflictException', async () => {
+      MockInstrumentoModel.findOne.mockResolvedValue(null);
+
+      // Simular constructor y save arrojando error E11000
+      const createDto = {
+        serial: 'BASC-DUP-MONGO',
+        marca: 'Torrey',
+        modelo: 'L-EQ',
+        tipo: TipoInstrumento.BASCULA,
+        categoriaExactitud: CategoriaExactitud.CLASE_III,
+        capacidadMaxima: 50,
+        unidadMedida: UnidadMedida.KG,
+        divisionEscala: 0.01,
+        fechaUltimaCalibracion: '2026-01-01T00:00:00.000Z',
+        fechaProximaCalibracion: '2027-01-01T00:00:00.000Z',
+      };
+
+      // Mock save to throw E11000
+      const errorE11000: any = new Error('E11000 duplicate key error collection: weightcontrol.instrumentos index: serial_1 dup key');
+      errorE11000.code = 11000;
+
+      const OrigMock = MockInstrumentoModel;
+      class FailingMockModel extends OrigMock {
+        override save = vi.fn().mockRejectedValue(errorE11000);
+      }
+
+      const module: TestingModule = await Test.createTestingModule({
+        providers: [
+          InstrumentosService,
+          {
+            provide: getModelToken(Instrumento.name),
+            useValue: FailingMockModel,
+          },
+          {
+            provide: ValidationEngineService,
+            useValue: mockValidationEngine,
+          },
+          {
+            provide: AuditService,
+            useValue: mockAuditService,
+          },
+        ],
+      }).compile();
+
+      const testService = module.get<InstrumentosService>(InstrumentosService);
+      await expect(testService.create(createDto as any, 'user_123')).rejects.toThrow(ConflictException);
+    });
+  });
+
+  describe('HU-05: Consulta Pública Sanitizada (Habeas Data)', () => {
+    it('debe retornar únicamente información pública sin filtrar datos sensibles del propietario ni creador', async () => {
+      MockInstrumentoModel.findOne.mockResolvedValue(mockInstrumentoDoc);
+
+      const publicDto = await service.verifyPublic('BASC-001');
+
+      // Campos metrológicos públicos permitidos
+      expect(publicDto.serial).toBe('BASC-001');
+      expect(publicDto.marca).toBe('Torrey');
+      expect(publicDto.modelo).toBe('L-EQ-5/10');
+      expect(publicDto.tipo).toBe(TipoInstrumento.BASCULA);
+      expect(publicDto.categoriaExactitud).toBe(CategoriaExactitud.CLASE_III);
+      expect(publicDto.estadoMetrologico).toBe(EstadoInstrumento.VIGENTE);
+      expect(publicDto.esVigente).toBe(true);
+      expect(publicDto.mensajeVerificacion).toContain('RUMP');
+
+      // Protección de datos personales (Habeas Data): NINGÚN dato de propietario expuesto
+      expect((publicDto as any).propietario).toBeUndefined();
+      expect((publicDto as any).nit).toBeUndefined();
+      expect((publicDto as any).creadoPor).toBeUndefined();
+      expect((publicDto as any).actualizadoPor).toBeUndefined();
+      expect((publicDto as any).establecimiento).toBeUndefined();
+    });
+
+    it('debe lanzar NotFoundException con mensaje certificado no verificable si el serial no existe', async () => {
+      MockInstrumentoModel.findOne.mockResolvedValue(null);
+
+      await expect(service.verifyPublic('SERIAL_INEXISTENTE')).rejects.toThrow(
+        NotFoundException,
+      );
+
+      await expect(service.verifyPublic('SERIAL_INEXISTENTE')).rejects.toThrow(
+        /certificado no verificable/i,
+      );
     });
   });
 

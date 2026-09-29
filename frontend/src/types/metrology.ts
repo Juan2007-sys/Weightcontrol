@@ -62,6 +62,7 @@ export type ActiveScreen =
   | 'instrumentos'
   | 'validaciones'
   | 'administracion'
+  | 'consulta-publica'
   | 'login';
 
 // Exportaciones en tiempo de ejecución para garantizar compatibilidad con bundlers ESM (Vite / Rollup)

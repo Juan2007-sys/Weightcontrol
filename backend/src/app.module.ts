@@ -10,6 +10,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { InstrumentosModule } from './modules/instrumentos/instrumentos.module.js';
 import { CalibracionesModule } from './modules/calibraciones/calibraciones.module.js';
 import { AlertasModule } from './modules/alertas/alertas.module.js';
+import { UsuariosModule } from './modules/usuarios/usuarios.module.js';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { AlertasModule } from './modules/alertas/alertas.module.js';
     DatabaseModule,
     AuditModule,
     AuthModule,
+    UsuariosModule,
     InstrumentosModule,
     CalibracionesModule,
     AlertasModule,

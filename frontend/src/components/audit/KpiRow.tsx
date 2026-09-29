@@ -20,13 +20,16 @@ export const KpiRow: React.FC = () => {
         ]);
 
         if (instStats.status === 'fulfilled' && instStats.value && instStats.value.total > 0) {
-          const val = instStats.value;
-          const criticas = alertStats.status === 'fulfilled' && alertStats.value ? alertStats.value.criticas : val.vencidos;
+          const val: any = instStats.value;
+          const vigentes = val.porEstado?.vigentes ?? val.vigentes ?? 0;
+          const porVencer = val.porEstado?.porVencer ?? val.porVencer ?? 0;
+          const vencidosRaw = val.porEstado?.vencidos ?? val.vencidos ?? 0;
+          const criticas = alertStats.status === 'fulfilled' && alertStats.value ? alertStats.value.criticas : vencidosRaw;
           setStats({
-            total: val.total,
-            vigentes: val.vigentes,
-            porVencer: val.porVencer,
-            vencidos: criticas || val.vencidos,
+            total: val.total || 0,
+            vigentes,
+            porVencer,
+            vencidos: criticas ?? vencidosRaw,
           });
         }
       } catch {
@@ -37,9 +40,10 @@ export const KpiRow: React.FC = () => {
     loadStats();
   }, []);
 
-  const conformityPercentage = stats.total > 0
-    ? ((stats.vigentes / stats.total) * 100).toFixed(1)
+  const conformityPercentage = (stats.total && stats.total > 0)
+    ? (((stats.vigentes ?? 0) / stats.total) * 100).toFixed(1)
     : '100';
+
   return (
     <section
       aria-label="Indicadores Clave de Desempeño Metrológico Nacional"
@@ -77,7 +81,7 @@ export const KpiRow: React.FC = () => {
               margin: '12px 0 10px 0',
             }}
           >
-            {stats.total.toLocaleString()}
+            {(stats.total ?? 0).toLocaleString()}
           </div>
 
           <div
@@ -95,7 +99,7 @@ export const KpiRow: React.FC = () => {
             <ServerIcon size={16} strokeWidth={1.5} style={{ color: 'var(--navy-900)', flexShrink: 0, marginTop: '2px' }} />
             <div>
               <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                {stats.total > 0 ? 'Trazabilidad y censo en tiempo real' : 'Sincronizando con base de datos...'}
+                {(stats.total ?? 0) > 0 ? 'Trazabilidad y censo en tiempo real' : 'Sincronizando con base de datos...'}
               </p>
               <p style={{ fontSize: '11px' }}>
                 Base de datos RUMP sincronizada con INM
@@ -144,7 +148,7 @@ export const KpiRow: React.FC = () => {
             <ShieldCheckIcon size={16} strokeWidth={1.5} style={{ color: 'var(--ok)', flexShrink: 0, marginTop: '2px' }} />
             <div>
               <p style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
-                {stats.vigentes.toLocaleString()} instrumentos conformes
+                {(stats.vigentes ?? 0).toLocaleString()} instrumentos conformes
               </p>
               <p style={{ fontSize: '11px' }}>
                 Validaciones conformes bajo NTC 2031
@@ -175,7 +179,7 @@ export const KpiRow: React.FC = () => {
               margin: '12px 0 10px 0',
             }}
           >
-            {stats.porVencer.toLocaleString()}
+            {(stats.porVencer ?? 0).toLocaleString()}
           </div>
 
           <div
@@ -224,7 +228,7 @@ export const KpiRow: React.FC = () => {
               margin: '12px 0 10px 0',
             }}
           >
-            {stats.vencidos.toLocaleString()}
+            {(stats.vencidos ?? 0).toLocaleString()}
           </div>
 
           <div

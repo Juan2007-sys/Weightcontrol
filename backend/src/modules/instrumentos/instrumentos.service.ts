@@ -3,6 +3,8 @@ import {
   NotFoundException,
   ConflictException,
   Logger,
+  Optional,
+  Inject,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -14,6 +16,8 @@ import {
   EntidadAfectada,
   TipoInstrumento,
   CategoriaExactitud,
+  Calibracion,
+  CalibracionDocument,
 } from '../../schemas/index.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ValidationEngineService } from './validators/validation-engine.service.js';
@@ -23,6 +27,7 @@ import { InstrumentoResponseDto } from './dto/instrumento-response.dto.js';
 import { QueryInstrumentosDto } from './dto/query-instrumentos.dto.js';
 import { PaginatedResponseDto } from './dto/paginated-response.dto.js';
 import { InstrumentoStatsDto } from './dto/instrumento-stats.dto.js';
+import { PublicVerificationDto } from './dto/public-verification.dto.js';
 
 @Injectable()
 export class InstrumentosService {
@@ -33,6 +38,9 @@ export class InstrumentosService {
     private readonly instrumentoModel: Model<InstrumentoDocument>,
     private readonly validationEngine: ValidationEngineService,
     private readonly auditService: AuditService,
+    @Optional()
+    @InjectModel(Calibracion.name)
+    private readonly calibracionModel?: Model<CalibracionDocument>,
   ) {}
 
   calcularEstado(fechaProxima: Date, umbralDias: number = 30): EstadoInstrumento {
@@ -71,10 +79,23 @@ export class InstrumentosService {
     userAgent?: string,
   ): Promise<InstrumentoResponseDto> {
     const serialNormalizado = createDto.serial.trim().toUpperCase();
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    const existing = await this.instrumentoModel.findOne({ serial: serialNormalizado });
+    const existing = await this.instrumentoModel.findOne({
+      serial: { $regex: new RegExp(`^${escapeRegex(serialNormalizado)}$`, 'i') },
+    });
     if (existing) {
       throw new ConflictException(`Ya existe un instrumento registrado con el serial '${serialNormalizado}'.`);
+    }
+
+    if (createDto.codigoPrecintoSIMEL) {
+      const precintoNormalizado = createDto.codigoPrecintoSIMEL.trim().toUpperCase();
+      const existingPrecinto = await this.instrumentoModel.findOne({
+        codigoPrecintoSIMEL: { $regex: new RegExp(`^${escapeRegex(precintoNormalizado)}$`, 'i') },
+      });
+      if (existingPrecinto) {
+        throw new ConflictException(`Ya existe un instrumento registrado con el precinto SIMEL '${precintoNormalizado}'.`);
+      }
     }
 
     const fechaUltima = new Date(createDto.fechaUltimaCalibracion);
@@ -93,10 +114,12 @@ export class InstrumentosService {
       tipo: createDto.tipo,
       categoriaExactitud: createDto.categoriaExactitud,
       capacidadMaxima: createDto.capacidadMaxima,
+      capacidadMinima: createDto.capacidadMinima,
       unidadMedida: createDto.unidadMedida,
       divisionEscala: createDto.divisionEscala,
       numeroDivisionesVerificacion: numeroDivisiones,
       codigoPrecintoSIMEL: createDto.codigoPrecintoSIMEL,
+      evidenciasFotograficas: createDto.evidenciasFotograficas,
       fechaUltimaCalibracion: fechaUltima,
       fechaProximaCalibracion: fechaProxima,
     });
@@ -114,7 +137,15 @@ export class InstrumentosService {
       actualizadoPor: userId,
     });
 
-    const guardado = await nuevoInstrumento.save();
+    let guardado: InstrumentoDocument;
+    try {
+      guardado = await nuevoInstrumento.save();
+    } catch (err: any) {
+      if (err?.code === 11000 || (err?.message && err.message.includes('E11000'))) {
+        throw new ConflictException(`Ya existe un instrumento registrado con el serial '${serialNormalizado}'.`);
+      }
+      throw err;
+    }
 
     // Auditoría inmutable (ISO/IEC 27001)
     await this.auditService.logEvent({
@@ -258,10 +289,15 @@ export class InstrumentosService {
 
     const previousState = instrumento.toObject();
 
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
     if (updateDto.serial) {
       const serialNormalizado = updateDto.serial.trim().toUpperCase();
       if (serialNormalizado !== instrumento.serial) {
-        const existing = await this.instrumentoModel.findOne({ serial: serialNormalizado });
+        const existing = await this.instrumentoModel.findOne({
+          serial: { $regex: new RegExp(`^${escapeRegex(serialNormalizado)}$`, 'i') },
+          _id: { $ne: id },
+        });
         if (existing) {
           throw new ConflictException(`Ya existe otro instrumento registrado con el serial '${serialNormalizado}'.`);
         }
@@ -274,9 +310,27 @@ export class InstrumentosService {
     if (updateDto.tipo !== undefined) instrumento.tipo = updateDto.tipo;
     if (updateDto.categoriaExactitud !== undefined) instrumento.categoriaExactitud = updateDto.categoriaExactitud;
     if (updateDto.capacidadMaxima !== undefined) instrumento.capacidadMaxima = updateDto.capacidadMaxima;
+    if (updateDto.capacidadMinima !== undefined) instrumento.capacidadMinima = updateDto.capacidadMinima;
     if (updateDto.unidadMedida !== undefined) instrumento.unidadMedida = updateDto.unidadMedida;
     if (updateDto.divisionEscala !== undefined) instrumento.divisionEscala = updateDto.divisionEscala;
-    if (updateDto.codigoPrecintoSIMEL !== undefined) instrumento.codigoPrecintoSIMEL = updateDto.codigoPrecintoSIMEL;
+    if (updateDto.evidenciasFotograficas !== undefined) instrumento.evidenciasFotograficas = updateDto.evidenciasFotograficas as any;
+    if (updateDto.codigoPrecintoSIMEL !== undefined) {
+      if (updateDto.codigoPrecintoSIMEL) {
+        const precintoNormalizado = updateDto.codigoPrecintoSIMEL.trim().toUpperCase();
+        if (precintoNormalizado !== instrumento.codigoPrecintoSIMEL) {
+          const existingPrecinto = await this.instrumentoModel.findOne({
+            codigoPrecintoSIMEL: { $regex: new RegExp(`^${escapeRegex(precintoNormalizado)}$`, 'i') },
+            _id: { $ne: id },
+          });
+          if (existingPrecinto) {
+            throw new ConflictException(`Ya existe otro instrumento registrado con el precinto SIMEL '${precintoNormalizado}'.`);
+          }
+        }
+        instrumento.codigoPrecintoSIMEL = precintoNormalizado;
+      } else {
+        instrumento.codigoPrecintoSIMEL = undefined;
+      }
+    }
     if (updateDto.propietario !== undefined) instrumento.propietario = updateDto.propietario as any;
     if (updateDto.ubicacionFisica !== undefined) instrumento.ubicacionFisica = updateDto.ubicacionFisica;
 
@@ -300,10 +354,12 @@ export class InstrumentosService {
       tipo: instrumento.tipo,
       categoriaExactitud: instrumento.categoriaExactitud,
       capacidadMaxima: instrumento.capacidadMaxima,
+      capacidadMinima: instrumento.capacidadMinima,
       unidadMedida: instrumento.unidadMedida,
       divisionEscala: instrumento.divisionEscala,
       numeroDivisionesVerificacion: instrumento.numeroDivisionesVerificacion,
       codigoPrecintoSIMEL: instrumento.codigoPrecintoSIMEL,
+      evidenciasFotograficas: instrumento.evidenciasFotograficas,
       fechaUltimaCalibracion: instrumento.fechaUltimaCalibracion,
       fechaProximaCalibracion: instrumento.fechaProximaCalibracion,
     });
@@ -375,7 +431,7 @@ export class InstrumentosService {
   }
 
   async findBySerial(serial: string): Promise<InstrumentoResponseDto> {
-    const serialNormalizado = serial.trim().toUpperCase();
+    const serialNormalizado = (serial || '').trim().toUpperCase();
     const instrumento = await this.instrumentoModel
       .findOne({ serial: serialNormalizado })
       .populate('creadoPor', 'nombre email rol')
@@ -388,6 +444,97 @@ export class InstrumentosService {
     return this.mapToResponse(instrumento);
   }
 
+  /**
+   * Consulta pública sanitizada de verificación ciudadana (HU-05).
+   * Cumple estrictamente con la Ley de Habeas Data: NO EXPONE datos del propietario ni usuarios internos.
+   * Si el serial no existe o fue alterado, arroja explícitamente "certificado no verificable".
+   */
+  async verifyPublic(serial: string): Promise<PublicVerificationDto> {
+    if (!serial || serial.trim() === '') {
+      throw new NotFoundException({
+        statusCode: 404,
+        error: 'Not Found',
+        message: 'certificado no verificable',
+      });
+    }
+
+    const serialNormalizado = serial.trim().toUpperCase();
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    let instrumento = await this.instrumentoModel.findOne({
+      serial: { $regex: new RegExp(`^${escapeRegex(serialNormalizado)}$`, 'i') },
+    });
+
+    let calEncontrada: any = null;
+    if (!instrumento && this.calibracionModel) {
+      calEncontrada = await this.calibracionModel
+        .findOne({
+          $or: [
+            { numeroCertificado: { $regex: new RegExp(`^${escapeRegex(serialNormalizado)}$`, 'i') } },
+            { codigoFolio: { $regex: new RegExp(`^${escapeRegex(serialNormalizado)}$`, 'i') } },
+          ],
+        })
+        .populate('instrumento');
+
+      if (calEncontrada && calEncontrada.instrumento) {
+        instrumento = calEncontrada.instrumento as any;
+      }
+    }
+
+    if (!instrumento) {
+      throw new NotFoundException({
+        statusCode: 404,
+        error: 'Not Found',
+        message: 'certificado no verificable',
+      });
+    }
+
+    const estadoCalculado = this.calcularEstado(instrumento.fechaProximaCalibracion);
+    const esVigente = estadoCalculado === EstadoInstrumento.VIGENTE;
+
+    let ultimoCertificado: any = undefined;
+    if (this.calibracionModel) {
+      try {
+        const cal: any = calEncontrada || await this.calibracionModel
+          .findOne({ instrumento: instrumento._id as any })
+          .sort({ fechaCalibracion: -1 });
+
+        if (cal) {
+          ultimoCertificado = {
+            numeroCertificado: cal.numeroCertificado,
+            codigoFolio: cal.codigoFolio || cal.numeroCertificado,
+            fechaCalibracion: cal.fechaCalibracion,
+            resultado: cal.resultado,
+            pdfUrl: `/api/calibraciones/${cal._id}/pdf`,
+          };
+        }
+      } catch {
+        // Fallback si no hay calibración
+      }
+    }
+
+    return {
+      serial: instrumento.serial,
+      marca: instrumento.marca,
+      modelo: instrumento.modelo,
+      tipo: instrumento.tipo,
+      categoriaExactitud: instrumento.categoriaExactitud,
+      capacidadMaxima: instrumento.capacidadMaxima,
+      capacidadMinima: instrumento.capacidadMinima ?? 0,
+      unidadMedida: instrumento.unidadMedida,
+      divisionEscala: instrumento.divisionEscala,
+      estadoMetrologico: estadoCalculado,
+      esVigente,
+      fechaUltimaCalibracion: instrumento.fechaUltimaCalibracion,
+      fechaProximaCalibracion: instrumento.fechaProximaCalibracion,
+      codigoPrecintoSIMEL: instrumento.codigoPrecintoSIMEL,
+      ultimoCertificado,
+      mensajeVerificacion: esVigente
+        ? 'Instrumento verificado y conforme ante el Registro Único de Metrología Legal (RUMP).'
+        : 'Instrumento con calibración vencida o en estado no conforme.',
+    };
+  }
+
   private mapToResponse(doc: InstrumentoDocument): InstrumentoResponseDto {
     return {
       id: doc._id.toString(),
@@ -397,11 +544,13 @@ export class InstrumentosService {
       tipo: doc.tipo,
       categoriaExactitud: doc.categoriaExactitud,
       capacidadMaxima: doc.capacidadMaxima,
+      capacidadMinima: doc.capacidadMinima ?? 0,
       unidadMedida: doc.unidadMedida,
       divisionEscala: doc.divisionEscala,
       numeroDivisionesVerificacion: doc.numeroDivisionesVerificacion,
       codigoPrecintoSIMEL: doc.codigoPrecintoSIMEL,
       propietario: doc.propietario,
+      evidenciasFotograficas: doc.evidenciasFotograficas,
       ubicacionFisica: doc.ubicacionFisica,
       fechaUltimaCalibracion: doc.fechaUltimaCalibracion,
       fechaProximaCalibracion: doc.fechaProximaCalibracion,
