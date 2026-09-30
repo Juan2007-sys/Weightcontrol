@@ -433,7 +433,7 @@ export class CalibracionesService {
         errorMaximoPermitido: e.errorMaximoPermitido,
         cumple: e.cumple,
       })),
-      verificationUrl: `https://weightcontrol.gov.co/verificar?serial=${encodeURIComponent(instrumento?.serial || '')}&cert=${encodeURIComponent(calibracion.numeroCertificado)}`,
+      verificationUrl: `${(process.env.PUBLIC_APP_URL || 'http://localhost:5173').replace(/\/+$/, '')}/?cert=${encodeURIComponent(calibracion.numeroCertificado)}&serial=${encodeURIComponent(instrumento?.serial || '')}`,
     });
   }
 

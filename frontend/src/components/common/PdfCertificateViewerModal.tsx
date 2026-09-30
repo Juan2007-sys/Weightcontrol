@@ -1,3 +1,4 @@
+import { buildVerificationUrl } from '../../utils/verificationUrl';
 import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -119,9 +120,7 @@ export const PdfCertificateViewerModal: React.FC<PdfCertificateViewerModalProps>
     setTimeout(() => setCopiedHash(false), 2000);
   };
 
-  const verificationUrl = metadata?.serial
-    ? `https://weightcontrol.gov.co/verificar?serial=${encodeURIComponent(metadata.serial)}&cert=${encodeURIComponent(certIdOrFolio)}`
-    : `https://weightcontrol.gov.co/verificar?cert=${encodeURIComponent(certIdOrFolio)}`;
+  const verificationUrl = buildVerificationUrl({ serial: metadata?.serial, cert: certIdOrFolio });
 
   return (
     <AnimatePresence>

@@ -1,3 +1,4 @@
+import { buildVerificationUrl } from '../../utils/verificationUrl';
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
@@ -46,7 +47,7 @@ export const RegistrationSuccessModal: React.FC<RegistrationSuccessModalProps> =
     ? new Date(data.createdAt).toLocaleString('es-CO')
     : new Date().toLocaleString('es-CO');
 
-  const verificationUrl = `https://weightcontrol.gov.co/verificar?serial=${encodeURIComponent(data.serial)}`;
+  const verificationUrl = buildVerificationUrl({ serial: data.serial });
 
   return (
     <AnimatePresence>

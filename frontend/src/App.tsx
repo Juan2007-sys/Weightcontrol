@@ -19,6 +19,7 @@ import { AdminSettingsView } from './components/admin/AdminSettingsView';
 import { PublicVerificationView } from './components/public/PublicVerificationView';
 import { LoginView } from './components/auth/LoginView';
 import { Toaster, toast } from 'sonner';
+import { readVerificationParam } from './utils/verificationUrl';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const INITIAL_FILTERS: FilterCriteria = {
@@ -31,11 +32,15 @@ const INITIAL_FILTERS: FilterCriteria = {
 
 export const App: React.FC = () => {
   const { user } = useAuth();
-  const [activeScreen, setActiveScreen] = useState<ActiveScreen>('auditoria');
+  // Si se llega desde un QR (?cert= / ?serial=) se abre directamente la consulta pública.
+  const [initialVerification] = useState<string>(readVerificationParam);
+  const [activeScreen, setActiveScreen] = useState<ActiveScreen>(
+    initialVerification ? 'consulta-publica' : 'auditoria',
+  );
   const [instruments, setInstruments] = useState<MetrologicalInstrument[]>([]);
   const [filters, setFilters] = useState<FilterCriteria>(INITIAL_FILTERS);
   const [activeFilterQuery, setActiveFilterQuery] = useState<FilterCriteria>(INITIAL_FILTERS);
-  const [publicVerificationSerial, setPublicVerificationSerial] = useState<string>('');
+  const [publicVerificationSerial, setPublicVerificationSerial] = useState<string>(initialVerification);
 
   const fetchInstruments = useCallback(async () => {
     try {

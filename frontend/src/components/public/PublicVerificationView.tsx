@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   SearchIcon,
@@ -16,6 +16,7 @@ import { calibracionesService } from '../../services/calibraciones.service';
 import { QrScannerModal } from './QrScannerModal';
 import { PdfCertificateViewerModal } from '../common/PdfCertificateViewerModal';
 import { toast } from 'sonner';
+import { buildVerificationUrl } from '../../utils/verificationUrl';
 
 interface PublicVerificationViewProps {
   initialSerial?: string;
@@ -88,6 +89,14 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
       setDownloadingPdf(false);
     }
   };
+
+  // Consulta automática al llegar desde un QR o con un serial precargado.
+  useEffect(() => {
+    if (initialSerial.trim()) {
+      handleSearch(initialSerial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialSerial]);
 
   return (
     <div style={{ paddingBottom: '48px', backgroundColor: '#F8FAFC', minHeight: '80vh' }}>
@@ -458,7 +467,7 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
                   }}
                 >
                   <QRCodeSVG
-                    value={`https://weightcontrol.gov.co/verificar?serial=${encodeURIComponent(result.serial)}`}
+                    value={buildVerificationUrl({ serial: result.serial, cert: result.ultimoCertificado?.numeroCertificado })}
                     size={136}
                     level="M"
                     includeMargin={false}

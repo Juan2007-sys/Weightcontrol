@@ -1,3 +1,4 @@
+import { buildVerificationUrl } from '../../utils/verificationUrl';
 import React, { useState } from 'react';
 import {
   XIcon,
@@ -296,7 +297,7 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                   }}
                 >
                   <QRCodeSVG
-                    value={`https://weightcontrol.gov.co/verificar?cert=${encodeURIComponent(numeroCertificado)}`}
+                    value={buildVerificationUrl({ cert: numeroCertificado })}
                     size={120}
                     level="M"
                     includeMargin={false}
