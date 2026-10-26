@@ -17,7 +17,7 @@ describe('ValidationEngineService (NTC 2031 & OCP)', () => {
     const basculaValidator = new BasculaValidator();
     const pesaValidator = new PesaValidator();
     const dinamometroValidator = new DinamometroValidator();
-    service = new ValidationEngineService(basculaValidator, pesaValidator, dinamometroValidator);
+    service = new ValidationEngineService([basculaValidator, pesaValidator, dinamometroValidator]);
   });
 
   describe('Validación de Básculas (IPFNA - NTC 2031)', () => {

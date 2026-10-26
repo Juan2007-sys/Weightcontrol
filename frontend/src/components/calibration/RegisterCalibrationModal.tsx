@@ -1,5 +1,5 @@
 import { buildVerificationUrl } from '../../utils/verificationUrl';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   XIcon,
   ShieldCheckIcon,
@@ -18,6 +18,14 @@ import { calibracionesService } from '../../services/calibraciones.service';
 import type { CreateCalibracionPayload, PatronCalibracion, PuntoEnsayoEMP } from '../../services/calibraciones.service';
 import { PdfCertificateViewerModal } from '../common/PdfCertificateViewerModal';
 import { toast } from 'sonner';
+import { todayLocalISO } from '../../utils/dates';
+import { useDialogA11y } from '../../utils/useDialogA11y';
+import {
+  CALIBRATION_FIELD_ORDER,
+  mapServerErrorToFields,
+  validateCalibrationForm,
+  type CalibrationFieldErrors,
+} from '../../utils/calibrationValidation';
 
 interface RegisterCalibrationModalProps {
   instruments: MetrologicalInstrument[];
@@ -43,10 +51,10 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
     'ONAC-18-LAB-042 (Laboratorio Metrológico Nacional)'
   );
   const [fechaCalibracion, setFechaCalibracion] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    todayLocalISO()
   );
   const [fechaProximaCalibracion, setFechaProximaCalibracion] = useState<string>(
-    new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    todayLocalISO(365)
   );
   const [resultado, setResultado] = useState<'Conforme' | 'No Conforme'>('Conforme');
   const [codigoPrecintoSIMEL] = useState<string>(
@@ -77,11 +85,54 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
   const [submitting, setSubmitting] = useState(false);
   const [issuedCertId, setIssuedCertId] = useState<string | null>(null);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
+  // La trampa de foco se suspende mientras el visor PDF (otro diálogo) está encima, para que Esc
+  // cierre solo el visor y no también este modal.
+  const dialogRef = useDialogA11y<HTMLDivElement>(!isPdfModalOpen, onClose);
 
   // Validaciones de completitud (HU-04)
-  const hasPatrones = patrones.length > 0 && patrones.every((p) => p.codigoPatron.trim() && p.certificadoTrazabilidad.trim());
-  const hasErrores = errores.length > 0;
-  const isCompletenessValid = hasPatrones && hasErrores && selectedInstrumentId && numeroCertificado.trim();
+  const [fieldErrors, setFieldErrors] = useState<CalibrationFieldErrors>({});
+  const [attempted, setAttempted] = useState(false);
+  // Los errores del servidor se limpian al editar cualquier dato del formulario.
+  useEffect(() => {
+    setFieldErrors({});
+  }, [selectedInstrumentId, numeroCertificado, fechaCalibracion, fechaProximaCalibracion, resultado, patrones, errores]);
+
+  const collectErrors = (): CalibrationFieldErrors =>
+    validateCalibrationForm({
+      instrumentoId: selectedInstrumentId,
+      numeroCertificado,
+      fechaCalibracion,
+      fechaProximaCalibracion,
+      resultado,
+      patrones,
+      puntos: errores,
+    });
+  const currentErrors = collectErrors();
+  const isCompletenessValid = Object.keys(currentErrors).length === 0;
+  // Tras un intento de emisión los mensajes se mantienen sincronizados con el estado actual.
+  const visibleErrors: CalibrationFieldErrors = attempted ? { ...fieldErrors, ...currentErrors } : {};
+
+  const focusFirstError = (errs: CalibrationFieldErrors) => {
+    const first = CALIBRATION_FIELD_ORDER.find((id) => errs[id]);
+    if (!first) return;
+    requestAnimationFrame(() => {
+      const el = document.getElementById(first);
+      el?.focus();
+    });
+  };
+
+  const fieldProps = (id: string) => ({
+    id,
+    'aria-invalid': visibleErrors[id] ? (true as const) : undefined,
+    'aria-describedby': visibleErrors[id] ? `${id}-error` : undefined,
+  });
+  const FieldError = ({ id }: { id: string }) =>
+    visibleErrors[id] ? (
+      <div id={`${id}-error`} role="alert" style={{ color: 'var(--danger)', fontSize: '11px', fontWeight: 600, marginTop: '4px' }}>
+        {visibleErrors[id]}
+      </div>
+    ) : null;
+  const errBorder = (id: string) => (visibleErrors[id] ? '1px solid var(--danger)' : '1px solid var(--border-strong)');
 
   const handleAddPatron = () => {
     setPatrones((prev) => [
@@ -128,8 +179,12 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
   };
 
   const handleSubmit = async () => {
-    if (!isCompletenessValid) {
-      toast.error('Calibración Incompleta: Debe registrar al menos 1 patrón trazable y 1 punto de ensayo contra el EMP.');
+    setAttempted(true);
+    const errs = collectErrors();
+    setFieldErrors({});
+    if (Object.keys(errs).length > 0) {
+      toast.error('Calibración incompleta: revise los campos marcados.');
+      focusFirstError(errs);
       return;
     }
 
@@ -159,6 +214,12 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
     } catch (err: any) {
       const status = err?.status;
       const msg = err?.message || 'Error al emitir calibración';
+      const serverFields = status === 400 || status === 409 ? mapServerErrorToFields(err?.data, msg) : {};
+      if (Object.keys(serverFields).length > 0) {
+        setAttempted(true);
+        setFieldErrors(serverFields);
+        focusFirstError(serverFields);
+      }
       if (status === 409) {
         toast.error(`Conflicto de Duplicidad: Ya existe una calibración con el certificado '${numeroCertificado}'.`);
       } else if (status === 403) {
@@ -189,6 +250,11 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={issuedCertId ? 'Certificado emitido' : 'Registrar calibración y emitir certificado'}
+        tabIndex={-1}
         className="gov-card"
         style={{
           width: '100%',
@@ -227,6 +293,7 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
           <button
             type="button"
             onClick={onClose}
+            aria-label="Cerrar"
             style={{ background: 'transparent', border: 'none', color: '#FFFFFF', cursor: 'pointer' }}
           >
             <XIcon size={20} />
@@ -328,6 +395,15 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                     <DownloadIcon size={16} />
                     <span>Descargar Archivo (.PDF)</span>
                   </button>
+
+                  <button
+                    type="button"
+                    className="btn-gov-secondary"
+                    onClick={onClose}
+                    style={{ padding: '10px 18px', fontSize: '13px', gap: '8px', justifyContent: 'center' }}
+                  >
+                    <span>Cerrar</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -341,10 +417,10 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                     INSTRUMENTO A CALIBRAR (CENSO RUMP)
                   </label>
                   <select
-                    id="cal-inst-select"
+                    {...fieldProps('cal-inst-select')}
                     value={selectedInstrumentId}
                     onChange={(e) => setSelectedInstrumentId(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-input)', border: '1px solid var(--border-strong)', fontSize: '13px' }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-input)', border: errBorder('cal-inst-select'), fontSize: '13px' }}
                   >
                     {instruments.map((inst) => (
                       <option key={inst.id} value={inst.id}>
@@ -352,6 +428,7 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                       </option>
                     ))}
                   </select>
+                  <FieldError id="cal-inst-select" />
                 </div>
 
                 <div>
@@ -359,13 +436,14 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                     NÚMERO DE CERTIFICADO / FOLIO
                   </label>
                   <input
-                    id="cal-num-cert"
+                    {...fieldProps('cal-num-cert')}
                     type="text"
                     className="font-mono"
                     value={numeroCertificado}
                     onChange={(e) => setNumeroCertificado(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-input)', border: '1px solid var(--border-strong)', fontWeight: 700 }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-input)', border: errBorder('cal-num-cert'), fontWeight: 700 }}
                   />
+                  <FieldError id="cal-num-cert" />
                 </div>
               </div>
 
@@ -376,12 +454,13 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                     FECHA DE CALIBRACIÓN
                   </label>
                   <input
-                    id="cal-date-cal"
+                    {...fieldProps('cal-date-cal')}
                     type="date"
                     value={fechaCalibracion}
                     onChange={(e) => setFechaCalibracion(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-input)', border: '1px solid var(--border-strong)' }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-input)', border: errBorder('cal-date-cal') }}
                   />
+                  <FieldError id="cal-date-cal" />
                 </div>
 
                 <div>
@@ -389,12 +468,13 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                     VENCIMIENTO / PRÓXIMA
                   </label>
                   <input
-                    id="cal-date-prox"
+                    {...fieldProps('cal-date-prox')}
                     type="date"
                     value={fechaProximaCalibracion}
                     onChange={(e) => setFechaProximaCalibracion(e.target.value)}
-                    style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-input)', border: '1px solid var(--border-strong)' }}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-input)', border: errBorder('cal-date-prox') }}
                   />
+                  <FieldError id="cal-date-prox" />
                 </div>
 
                 <div>
@@ -402,7 +482,7 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                     DICTAMEN METROLÓGICO
                   </label>
                   <select
-                    id="cal-res"
+                    {...fieldProps('cal-res')}
                     value={resultado}
                     onChange={(e) => setResultado(e.target.value as any)}
                     style={{
@@ -418,11 +498,20 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                     <option value="Conforme">CONFORME (APTO)</option>
                     <option value="No Conforme">NO CONFORME (RECHAZADO)</option>
                   </select>
+                  <FieldError id="cal-res" />
                 </div>
               </div>
 
               {/* 3. Patrones Trazables Requeridos (HU-04) */}
-              <div>
+              <div
+                id="cal-patrones"
+                tabIndex={-1}
+                aria-invalid={visibleErrors['cal-patrones'] ? true : undefined}
+                aria-describedby={visibleErrors['cal-patrones'] ? 'cal-patrones-error' : undefined}
+                role="group"
+                aria-label="Patrones metrológicos trazables"
+                style={{ outline: 'none' }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <span className="microlabel" style={{ color: 'var(--navy-900)', fontWeight: 800 }}>
                     1. PATRONES METROLÓGICOS TRAZABLES UTILIZADOS (MÍNIMO 1 REQUERIDO)
@@ -438,7 +527,7 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                   </button>
                 </div>
 
-                {patrones.length === 0 ? (
+                {patrones.length === 0 && !attempted ? (
                   <div style={{ padding: '12px', backgroundColor: '#FEF2F2', border: '1px solid #FCA5A5', color: '#991B1B', fontSize: '12px', borderRadius: '4px' }}>
                     ⚠️ Debe declarar al menos 1 patrón de calibración trazable para poder emitir el certificado.
                   </div>
@@ -502,10 +591,19 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                     ))}
                   </div>
                 )}
+                <FieldError id="cal-patrones" />
               </div>
 
               {/* 4. Ensayos y Evaluación de Error Máximo Permitido (EMP) */}
-              <div>
+              <div
+                id="cal-puntos"
+                tabIndex={-1}
+                aria-invalid={visibleErrors['cal-puntos'] ? true : undefined}
+                aria-describedby={visibleErrors['cal-puntos'] ? 'cal-puntos-error' : undefined}
+                role="group"
+                aria-label="Puntos de ensayo contra el EMP"
+                style={{ outline: 'none' }}
+              >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                   <span className="microlabel" style={{ color: 'var(--navy-900)', fontWeight: 800 }}>
                     2. PUNTOS DE ENSAYO DE ERROR CONTRA EL EMP (NTC 2031)
@@ -580,6 +678,7 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
                     </tbody>
                   </table>
                 </div>
+                <FieldError id="cal-puntos" />
               </div>
             </>
           )}
@@ -598,17 +697,17 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12px' }}>
-              {!isCompletenessValid ? (
-                <span style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {attempted && !isCompletenessValid ? (
+                <span role="alert" style={{ color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <AlertTriangleIcon size={14} />
-                  Calibración incompleta (se requiere al menos 1 patrón y 1 punto de ensayo).
+                  {`Calibración incompleta: corrija ${Object.keys(currentErrors).length} campo(s) marcado(s).`}
                 </span>
-              ) : (
+              ) : isCompletenessValid ? (
                 <span style={{ color: 'var(--ok)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <CheckIcon size={14} />
                   Completitud técnica metrológica validada.
                 </span>
-              )}
+              ) : null}
             </div>
 
             <div style={{ display: 'flex', gap: '10px' }}>
@@ -622,7 +721,7 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
               <button
                 type="button"
                 className="btn-gov-primary"
-                disabled={submitting || !isCompletenessValid}
+                disabled={submitting}
                 onClick={handleSubmit}
                 style={{ gap: '6px' }}
               >
@@ -640,6 +739,8 @@ export const RegisterCalibrationModal: React.FC<RegisterCalibrationModalProps> =
             certIdOrFolio={issuedCertId}
             title={`Certificado Oficial Emitido · ${numeroCertificado}`}
             metadata={{
+              numeroCertificado,
+              serial: instruments.find((i) => i.id === selectedInstrumentId)?.serial,
               estado: resultado.toUpperCase(),
               laboratorioOEC: laboratorioAcreditado,
               fechaEmision: fechaCalibracion,

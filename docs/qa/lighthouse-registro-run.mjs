@@ -1,0 +1,17 @@
+import puppeteer from 'puppeteer-core';
+import {startFlow} from 'lighthouse';
+import fs from 'fs';
+const browser = await puppeteer.launch({executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe',headless:'new',args:['--no-sandbox']});
+const page = await browser.newPage();
+await page.setViewport({width:1366,height:900});
+await page.setRequestInterception(true);
+page.on('request', r=>{const u=r.url(); if(u.includes('localhost:3000/api')){const j=(o,s=200)=>r.respond({status:s,contentType:'application/json',headers:{'access-control-allow-origin':'*'},body:JSON.stringify(o)}); if(u.includes('/auth/profile')) return j({id:'1',nombre:'QA Admin',email:'qa@x.co',rol:'ADMIN',activo:true}); return j({items:[],total:0,page:1,limit:100,totalPages:0,data:[]});} r.continue();});
+await page.evaluateOnNewDocument(()=>{localStorage.setItem('wc_auth_token','x');localStorage.setItem('wc_auth_user',JSON.stringify({id:'1',nombre:'QA Admin',email:'qa@x.co',rol:'ADMIN',activo:true}));});
+await page.goto('http://localhost:5199/',{waitUntil:'networkidle0'});
+const [b]=await page.$$('xpath/.//button[contains(., "Radicar Inspección")]'); await b.click(); await new Promise(r=>setTimeout(r,1500));
+const flow = await startFlow(page,{config:{extends:'lighthouse:default',settings:{onlyCategories:['accessibility']}}});
+await flow.snapshot({name:'registro'});
+const lhr = (await flow.createFlowResult()).steps[0].lhr;
+fs.writeFileSync(process.argv[2],JSON.stringify(lhr));
+console.log('registro score',lhr.categories.accessibility.score,Object.entries(lhr.audits).filter(([k,a])=>a.score===0).map(([k])=>k));
+await browser.close();

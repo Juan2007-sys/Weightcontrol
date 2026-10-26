@@ -1,4 +1,5 @@
 import type { MetrologicalInstrument, MetrologyStatus } from '../types/metrology';
+import { formatCalendarDate } from '../utils/dates';
 
 export interface BackendInstrumento {
   id?: string;
@@ -87,9 +88,7 @@ export function mapBackendInstrumentToFrontend(item: BackendInstrumento): Metrol
     accionRecomendada = 'Inmovilización preventiva / Auto de sellamiento';
   }
 
-  const fechaFormat = item.fechaUltimaCalibracion 
-    ? new Date(item.fechaUltimaCalibracion).toLocaleDateString('es-CO')
-    : 'No registrada';
+  const fechaFormat = formatCalendarDate(item.fechaUltimaCalibracion);
 
   return {
     id,

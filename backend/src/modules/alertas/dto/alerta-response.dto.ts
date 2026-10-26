@@ -7,7 +7,7 @@ export interface AlertaResponseDto {
   marca: string;
   modelo: string;
   fechaProximaCalibracion: Date;
-  diasRestantes: number;
+  diasRestantes: number | null;
   nivelCriticidad: NivelAlerta;
   mensaje: string;
   canalesNotificados: string[];

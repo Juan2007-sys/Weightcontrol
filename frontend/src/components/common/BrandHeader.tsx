@@ -15,9 +15,9 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
   const handleNavigate = (screen: ActiveScreen) => {
     // Verificación de RBAC en frontend para feedback inmediato
     if (screen === 'administracion') {
-      if (!user || user.rol !== 'ADMIN') {
+      if (!user || !['ADMIN', 'AUDITOR', 'SIC'].includes(user.rol)) {
         toast.error(
-          `🛑 Acceso Denegado (403): La Consola de Administración requiere rol ADMINISTRADOR. Su rol actual es [${user?.rol || 'ANÓNIMO'}].`
+          `🛑 Acceso Denegado (403): La Consola de Administración/Trazabilidad requiere rol ADMINISTRADOR, AUDITOR o SIC. Su rol actual es [${user?.rol || 'ANÓNIMO'}].`
         );
         return;
       }
@@ -208,7 +208,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
               whiteSpace: 'nowrap',
             }}
           >
-            Administración del Sistema
+            {user && user.rol !== 'ADMIN' ? 'Trazabilidad y Auditoría' : 'Administración del Sistema'}
           </button>
 
           <button

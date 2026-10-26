@@ -1,0 +1,8 @@
+login: 8 paradas de Tab; trampa=false; sin outline visible=0
+login por teclado (Enter) -> sin sesion: Autenticación institucional exitosa. Bienvenido al SICM.
+REPÚBLICA DE COLOMBIA
+G
+registro: 26 paradas de Tab; trampa=false; sin outline visible=0
+registro: Enter sobre la fase 2 -> ok
+consulta-publica: 11 paradas de Tab; trampa=false; sin outline visible=0
+QrScannerModal: abre=true; foco dentro=true; tras 12 Tab sigue dentro=true; Esc cierra=true; foco vuelve a="ESCANEAR CON CÁMARA"

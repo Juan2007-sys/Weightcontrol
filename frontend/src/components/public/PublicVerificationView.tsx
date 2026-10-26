@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   SearchIcon,
@@ -16,7 +16,8 @@ import { calibracionesService } from '../../services/calibraciones.service';
 import { QrScannerModal } from './QrScannerModal';
 import { PdfCertificateViewerModal } from '../common/PdfCertificateViewerModal';
 import { toast } from 'sonner';
-import { buildVerificationUrl } from '../../utils/verificationUrl';
+import { buildVerificationUrl, readVerificationQuery } from '../../utils/verificationUrl';
+import { formatCalendarDate } from '../../utils/dates';
 
 interface PublicVerificationViewProps {
   initialSerial?: string;
@@ -36,8 +37,24 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isPdfModalOpen, setIsPdfModalOpen] = useState(false);
 
-  const handleSearch = async (serialToSearch?: string) => {
+  // QR firmado con el que se llego a la pagina (?cert=&serial=&sig=); solo se aplica a la consulta automatica inicial.
+  const urlQrRef = useRef<{ cert: string; sig: string } | null | undefined>(undefined);
+  const takeUrlQr = (target: string): { cert: string; sig: string } | undefined => {
+    if (urlQrRef.current === undefined) {
+      const q = readVerificationQuery();
+      urlQrRef.current =
+        q.cert && (q.serial.toUpperCase() === target || q.cert.toUpperCase() === target)
+          ? { cert: q.cert, sig: q.sig }
+          : null;
+    }
+    return urlQrRef.current ?? undefined;
+  };
+
+  const handleSearch = async (serialToSearch?: string, qrFromScanner?: { cert?: string; sig?: string }) => {
     const target = (serialToSearch || searchSerial).trim().toUpperCase();
+    // Consulta automatica al cargar (serialToSearch === initialSerial): usa el QR de la URL si existe.
+    const isAutoLoad = Boolean(serialToSearch) && target === initialSerial.trim().toUpperCase();
+    const qr = qrFromScanner ?? (isAutoLoad ? takeUrlQr(target) : undefined);
     if (!target) {
       toast.error('Por favor ingrese un número de serial metrológico.');
       return;
@@ -48,9 +65,14 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
     setResult(null);
 
     try {
-      const data = await instrumentosService.verifyPublic(target);
+      // QR firmado (HU-05): se envian cert y sig; la consulta manual por serial va sin ellos.
+      const data = await instrumentosService.verifyPublic(target, qr);
       setResult(data);
-      toast.success(`Instrumento ${data.serial} verificado con éxito.`);
+      if (data.certificadoAnulado) {
+        toast.warning(`El certificado de ${data.serial} está ANULADO y ya no es vigente.`);
+      } else {
+        toast.success(`Instrumento ${data.serial} verificado con éxito.`);
+      }
     } catch (err: any) {
       const status = err?.status;
       const msg = err?.message || '';
@@ -72,6 +94,24 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
       setLoading(false);
     }
   };
+
+  // Estado publico coherente (color + icono + texto): un certificado anulado o con resultado
+  // No Conforme nunca se presenta como VIGENTE aunque las fechas no hayan vencido.
+  const publicStatus = (() => {
+    if (!result) return null;
+    const noConforme = result.ultimoCertificado?.resultado === 'No Conforme';
+    // Un No Conforme tiene prioridad: el backend tambien lo marca anulado, pero el motivo publico es el dictamen.
+    if (noConforme) {
+      return { ok: false, chip: 'NO CONFORME', title: 'ESTADO: INSTRUMENTO NO CONFORME / NO VIGENTE' };
+    }
+    if (result.certificadoAnulado) {
+      return { ok: false, chip: 'ANULADO', title: 'ESTADO: CERTIFICADO ANULADO / NO VIGENTE' };
+    }
+    if (!result.esVigente) {
+      return { ok: false, chip: 'NO VIGENTE', title: 'ESTADO: INSTRUMENTO NO APTO / VENCIDO' };
+    }
+    return { ok: true, chip: 'VIGENTE', title: 'ESTADO: INSTRUMENTO CONFORME Y VIGENTE' };
+  })();
 
   const handleDownloadPdf = async () => {
     if (!result) return;
@@ -191,6 +231,9 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
               <input
                 id="public-serial-input"
                 type="text"
+                autoComplete="off"
+                aria-invalid={errorMessage ? true : undefined}
+                aria-describedby={errorMessage ? 'public-verification-error' : undefined}
                 className="font-mono"
                 value={searchSerial}
                 onChange={(e) => setSearchSerial(e.target.value)}
@@ -211,6 +254,7 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
               type="button"
               className="btn-gov-primary"
               disabled={loading}
+              aria-busy={loading}
               onClick={() => handleSearch()}
               style={{ padding: '0 20px', height: '46px', fontSize: '14px' }}
             >
@@ -273,8 +317,11 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
         </div>
 
         {/* Mensaje de Error Explícito: Certificado no verificable */}
+        <div aria-live="polite" aria-atomic="true">
         {errorMessage && (
           <div
+            id="public-verification-error"
+            role="alert"
             className="gov-card"
             style={{
               padding: '20px 24px',
@@ -288,9 +335,9 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <AlertTriangleIcon size={24} style={{ color: '#DC2626', flexShrink: 0 }} />
               <div>
-                <div style={{ fontSize: '16px', fontWeight: 800, textTransform: 'uppercase' }}>
+                <h2 style={{ fontSize: '16px', fontWeight: 800, textTransform: 'uppercase', margin: 0 }}>
                   Dictamen de Consulta Pública
-                </div>
+                </h2>
                 <div style={{ fontSize: '14px', marginTop: '4px', fontWeight: 600 }}>
                   {errorMessage}
                 </div>
@@ -318,7 +365,7 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
             <div
               style={{
                 padding: '20px 24px',
-                backgroundColor: result.esVigente ? '#064E3B' : '#7F1D1D',
+                backgroundColor: publicStatus?.ok ? '#064E3B' : '#7F1D1D',
                 color: '#FFFFFF',
                 display: 'flex',
                 justifyContent: 'space-between',
@@ -333,15 +380,25 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
                   <div className="microlabel" style={{ color: 'rgba(255,255,255,0.8)' }}>
                     DICTAMEN METROLÓGICO OFICIAL DE CONFORMIDAD
                   </div>
-                  <div style={{ fontSize: '20px', fontWeight: 800 }}>
-                    {result.esVigente ? 'ESTADO: INSTRUMENTO CONFORME Y VIGENTE' : 'ESTADO: INSTRUMENTO NO APTO / VENCIDO'}
-                  </div>
+                  <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>
+                    {publicStatus?.title}
+                  </h2>
+                  {result.certificadoAnulado && result.ultimoCertificado?.resultado !== 'No Conforme' && (
+                    <p style={{ margin: '4px 0 0 0', fontSize: '13px' }}>
+                      Este certificado fue anulado y reemplazado
+                      {result.ultimoCertificado?.reemplazadoPorNumero
+                        ? ` por el certificado ${result.ultimoCertificado.reemplazadoPorNumero}`
+                        : ''}
+                      . No lo utilice como prueba de conformidad.
+                    </p>
+                  )}
                 </div>
               </div>
 
               <span
+                data-testid="public-status-chip"
                 style={{
-                  backgroundColor: result.esVigente ? '#059669' : '#DC2626',
+                  backgroundColor: publicStatus?.ok ? 'var(--ok)' : 'var(--danger)',
                   color: '#FFFFFF',
                   padding: '6px 14px',
                   borderRadius: 'var(--radius-pill)',
@@ -349,9 +406,13 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
                   fontSize: '13px',
                   letterSpacing: '0.05em',
                   fontFamily: 'var(--font-mono)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
                 }}
               >
-                {result.estadoMetrologico.toUpperCase()}
+                {publicStatus?.ok ? <ShieldCheckIcon size={14} aria-hidden="true" /> : <AlertTriangleIcon size={14} aria-hidden="true" />}
+                {publicStatus?.chip}
               </span>
             </div>
 
@@ -359,9 +420,9 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
             <div style={{ padding: '24px', display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '24px' }}>
               {/* Columna Izquierda: Especificaciones Técnicas */}
               <div>
-                <div className="microlabel" style={{ color: 'var(--navy-900)', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>
+                <h3 className="microlabel" style={{ color: 'var(--navy-900)', marginTop: 0, marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>
                   1. IDENTIFICACIÓN Y ESPECIFICACIONES TÉCNICAS (NTC 2031)
-                </div>
+                </h3>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
                   <div>
@@ -398,7 +459,7 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
                   </div>
 
                   <div>
-                    <span className="microlabel" style={{ color: 'var(--text-muted)' }}>DIVISIÓN DE ESCALA ($e$):</span>
+                    <span className="microlabel" style={{ color: 'var(--text-muted)' }}>DIVISIÓN DE ESCALA (e):</span>
                     <div className="font-mono" style={{ fontWeight: 600 }}>
                       {result.divisionEscala} {result.unidadMedida}
                     </div>
@@ -414,22 +475,22 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
                   )}
                 </div>
 
-                <div className="microlabel" style={{ color: 'var(--navy-900)', marginTop: '20px', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>
+                <h3 className="microlabel" style={{ color: 'var(--navy-900)', marginTop: '20px', marginBottom: '12px', borderBottom: '1px solid var(--border)', paddingBottom: '6px' }}>
                   2. VIGENCIA Y CRONOGRAMA LEGAL
-                </div>
+                </h3>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', fontSize: '13px' }}>
                   <div>
                     <span className="microlabel" style={{ color: 'var(--text-muted)' }}>ÚLTIMA CALIBRACIÓN:</span>
                     <div className="font-mono" style={{ fontWeight: 700 }}>
-                      {new Date(result.fechaUltimaCalibracion).toLocaleDateString('es-CO')}
+                      {formatCalendarDate(result.fechaUltimaCalibracion)}
                     </div>
                   </div>
 
                   <div>
                     <span className="microlabel" style={{ color: 'var(--text-muted)' }}>PRÓXIMA CALIBRACIÓN LÍMITE:</span>
-                    <div className="font-mono" style={{ fontWeight: 800, color: result.esVigente ? '#065F46' : '#991B1B' }}>
-                      {new Date(result.fechaProximaCalibracion).toLocaleDateString('es-CO')}
+                    <div className="font-mono" style={{ fontWeight: 800, color: publicStatus?.ok ? '#065F46' : '#991B1B' }}>
+                      {formatCalendarDate(result.fechaProximaCalibracion)}
                     </div>
                   </div>
                 </div>
@@ -448,9 +509,9 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
                   textAlign: 'center',
                 }}
               >
-                <div className="microlabel" style={{ color: 'var(--navy-900)', marginBottom: '8px' }}>
+                <h3 className="microlabel" style={{ color: 'var(--navy-900)', marginTop: 0, marginBottom: '8px' }}>
                   CÓDIGO QR DINÁMICO DE VERIFICACIÓN
-                </div>
+                </h3>
 
                 {/* Renderizado de QR Vectorial Nítido con qrcode.react */}
                 <div
@@ -467,12 +528,13 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
                   }}
                 >
                   <QRCodeSVG
-                    value={buildVerificationUrl({ serial: result.serial, cert: result.ultimoCertificado?.numeroCertificado })}
+                    value={buildVerificationUrl({ serial: result.serial })}
                     size={136}
                     level="M"
                     includeMargin={false}
+                    title={`Código QR de consulta pública del instrumento ${result.serial}`}
                   />
-                  <span className="font-mono" style={{ fontSize: '10px', fontWeight: 700, color: 'var(--navy-900)', marginTop: '8px' }}>
+                  <span className="font-mono" style={{ fontSize: '12px', fontWeight: 700, color: 'var(--navy-900)', marginTop: '8px' }}>
                     {result.serial}
                   </span>
                 </div>
@@ -509,6 +571,8 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
           </div>
         )}
 
+        </div>
+
         {/* Modal de Previsualización Interactiva Oficial de Certificado PDF */}
         {result && (
           <PdfCertificateViewerModal
@@ -516,10 +580,11 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
             certIdOrFolio={result.ultimoCertificado?.numeroCertificado || result.serial}
             title={`Certificado Oficial · ${result.serial}`}
             metadata={{
+              numeroCertificado: result.ultimoCertificado?.numeroCertificado,
               serial: result.serial,
               marca: result.marca,
               modelo: result.modelo,
-              estado: result.esVigente ? 'VIGENTE · CONFORME' : 'VENCIDO O NO CONFORME',
+              estado: publicStatus?.ok ? 'VIGENTE · CONFORME' : result.certificadoAnulado ? 'ANULADO' : 'VENCIDO O NO CONFORME',
               fechaEmision: result.fechaUltimaCalibracion,
               fechaVencimiento: result.fechaProximaCalibracion,
               precintoSIMEL: result.codigoPrecintoSIMEL,
@@ -534,9 +599,9 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
         <QrScannerModal
           isOpen={isScannerOpen}
           onClose={() => setIsScannerOpen(false)}
-          onScanSuccess={(scannedSerial) => {
+          onScanSuccess={(scannedSerial, qr) => {
             setSearchSerial(scannedSerial);
-            handleSearch(scannedSerial);
+            handleSearch(scannedSerial, qr);
             toast.success(`Código QR escaneado: ${scannedSerial}`);
           }}
         />

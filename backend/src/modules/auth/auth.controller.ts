@@ -8,6 +8,8 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { AuditedThrottlerGuard } from '../../common/guards/audited-throttler.guard.js';
 import type { Request } from 'express';
 import { AuthService } from './auth.service.js';
 import { LoginDto } from './dto/login.dto.js';
@@ -15,6 +17,10 @@ import { RegisterDto } from './dto/register.dto.js';
 import { AuthResponseDto, UserResponseDto } from './dto/auth-response.dto.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
+
+// Límite de intentos de login por IP: frena la fuerza bruta (escenario S2).
+export const LOGIN_RATE_LIMIT = 5;
+export const LOGIN_RATE_TTL_MS = 60_000;
 
 @Controller('auth')
 export class AuthController {
@@ -31,6 +37,8 @@ export class AuthController {
     return this.authService.register(registerDto, ipAddress, userAgent);
   }
 
+  @UseGuards(AuditedThrottlerGuard)
+  @Throttle({ default: { limit: LOGIN_RATE_LIMIT, ttl: LOGIN_RATE_TTL_MS } })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   async login(

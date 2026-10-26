@@ -1,8 +1,17 @@
 import { TipoInstrumento, CategoriaExactitud } from '../../../schemas/instrumento.schema.js';
 
+/** Error de validacion asociado a un campo del formulario (HU-02). */
+export interface FieldError {
+  campo: string;
+  mensaje: string;
+}
+
 export interface ValidationResult {
   isValid: boolean;
+  /** Contrato historico: lista plana de mensajes. */
   errors: string[];
+  /** Mismos errores con el campo al que pertenecen (aditivo, no rompe `errors`). */
+  fieldErrors?: FieldError[];
 }
 
 export interface InstrumentoValidationData {

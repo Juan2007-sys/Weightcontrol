@@ -135,6 +135,13 @@ export class Instrumento {
   })
   estado: EstadoInstrumento;
 
+  /**
+   * Causa explicita del estado Vencido cuando no es por fecha (C2): 'NO_CONFORME' tras una
+   * calibracion No Conforme. Solo una calibracion Conforme posterior lo restablece.
+   */
+  @Prop({ type: String, enum: ['NO_CONFORME'], required: false })
+  motivoVencimiento?: 'NO_CONFORME';
+
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Usuario' })
   creadoPor?: Usuario | string;
 

@@ -1,0 +1,40 @@
+{
+  "login": {
+    "url": "http://localhost:5199/",
+    "violations": [],
+    "passes": 50
+  },
+  "consulta-publica": {
+    "url": "http://localhost:5199/?serial=QA-NOEXISTE",
+    "violations": [],
+    "passes": 43
+  },
+  "registro": {
+    "url": "http://localhost:5199/",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          "div:nth-child(2) > div:nth-child(2) > .microlabel-sm ::   Element has insufficient color contrast of 3.42 (foreground color: #788596, background color: #f1f5f9, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(2) > .microlabel-sm ::   Element has insufficient color contrast of 3.42 (foreground color: #788596, background color: #f1f5f9, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(5) > div:nth-child(3) > div:nth-child(1) > .microlabel ::   Element has insufficient color contrast of 4.09 (foreground color: #0284c7, background color: #ffffff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(1) > div:nth-child(4) ::   Element has insufficient color contrast of 2.56 (foreground color: #94a3b8, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(5) > div:nth-child(3) > div:nth-child(2) > .microlabel ::   Element has insufficient color contrast of 3.76 (foreground color: #059669, background color: #ffffff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(2) > div:nth-child(4) ::   Element has insufficient color contrast of 2.56 (foreground color: #94a3b8, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(3) > div:nth-child(4) ::   Element has insufficient color contrast of 2.56 (foreground color: #94a3b8, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+        ]
+      },
+      {
+        "id": "heading-order",
+        "impact": "moderate",
+        "help": "Heading levels should only increase by one",
+        "nodes": [
+          "h4 ::   Heading order invalid"
+        ]
+      }
+    ],
+    "passes": 45
+  }
+}

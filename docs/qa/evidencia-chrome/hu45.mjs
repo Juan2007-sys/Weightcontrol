@@ -1,0 +1,22 @@
+import {api,tok} from './lib.mjs'; import fs from 'fs';
+const t=tok(); const ids=JSON.parse(fs.readFileSync('ids.json'));
+const show=(n,r)=>console.log('\n##',n,'=>',r.status,JSON.stringify(r.body).slice(0,500));
+const q='?cert=QA-CERT-001&serial=QA-BASC-001&sig=dxoAzEL0hNxe_xSOvnZH4zr8cObxrCOj29FILmeTxqI';
+const v=(cert,serial,sig)=>api('GET',`/instrumentos/public/verificar/${encodeURIComponent(serial)}?cert=${encodeURIComponent(cert)}&sig=${encodeURIComponent(sig)}`);
+show('QR valido',await v('QA-CERT-001','QA-BASC-001','dxoAzEL0hNxe_xSOvnZH4zr8cObxrCOj29FILmeTxqI'));
+show('sig alterada',await v('QA-CERT-001','QA-BASC-001','dxoAzEL0hNxe_xSOvnZH4zr8cObxrCOj29FILmeTxqX'));
+show('sin sig',await v('QA-CERT-001','QA-BASC-001',''));
+show('cert de otro serial',await v('QA-CERT-NC','QA-BASC-001','dxoAzEL0hNxe_xSOvnZH4zr8cObxrCOj29FILmeTxqI'));
+show('serial inexistente con sig',await v('QA-CERT-001','QA-NOEXISTE','dxoAzEL0hNxe_xSOvnZH4zr8cObxrCOj29FILmeTxqI'));
+// corregir
+const body={motivo:'QA: correccion de error de transcripcion de lecturas',nuevaCalibracion:{instrumentoId:ids.id1,laboratorioAcreditado:'QA Lab',numeroCertificado:'QA-CERT-001B',fechaCalibracion:'2026-10-24',fechaProximaCalibracion:'2027-10-24',resultado:'Conforme',patronesUtilizados:[{codigoPatron:'QA-P1',descripcion:'Pesa patron',certificadoTrazabilidad:'QA-TR-1',fechaVencimientoPatron:'2027-06-01'}],erroresMaximosPermitidos:[{cargaNominal:50,errorEncontrado:0.01,errorMaximoPermitido:0.05,cumple:true}]}};
+show('corregir sin motivo',await api('POST',`/calibraciones/${ids.c1}/corregir`,{token:t.tecnico,body:{...body,motivo:''}}));
+show('corregir AUDITOR',await api('POST',`/calibraciones/${ids.c1}/corregir`,{token:t.auditor,body}));
+const c=await api('POST',`/calibraciones/${ids.c1}/corregir`,{token:t.tecnico,body}); show('CORREGIR TECNICO',c);
+fs.writeFileSync('ids2.json',JSON.stringify({c1b:c.body.id}));
+show('corregir de nuevo (ya anulado)',await api('POST',`/calibraciones/${ids.c1}/corregir`,{token:t.tecnico,body:{...body,nuevaCalibracion:{...body.nuevaCalibracion,numeroCertificado:'QA-CERT-001C'}}}));
+const o=await api('GET','/calibraciones/'+ids.c1,{token:t.tecnico});console.log('ORIGINAL anulado=',o.body.anulado,o.body.motivoAnulacion,o.body.certificadoReemplazadoPor);
+show('QR original tras anular',await v('QA-CERT-001','QA-BASC-001','dxoAzEL0hNxe_xSOvnZH4zr8cObxrCOj29FILmeTxqI'));
+show('publico serial tras corregir',await api('GET','/instrumentos/public/verificar/QA-BASC-001'));
+const pdf=await fetch('http://localhost:3000/api/calibraciones/'+ids.c1+'/pdf');fs.writeFileSync('c1_anulado.pdf',Buffer.from(await pdf.arrayBuffer()));
+const pdf2=await fetch('http://localhost:3000/api/calibraciones/'+c.body.id+'/pdf');fs.writeFileSync('c1b.pdf',Buffer.from(await pdf2.arrayBuffer()));

@@ -5,9 +5,11 @@ import type { MetrologicalInstrument } from '../types/metrology';
 
 export interface PaginatedResponse<T> {
   data: T[];
-  total: number;
-  page: number;
-  totalPages: number;
+  /** El backend devuelve el total en `meta.total`; `total` se mantiene por compatibilidad. */
+  meta?: { total: number; page?: number; limit?: number; totalPages?: number };
+  total?: number;
+  page?: number;
+  totalPages?: number;
 }
 
 export interface InstrumentoStats {
@@ -53,6 +55,9 @@ export interface PublicUltimoCertificadoDto {
   pdfUrl?: string;
   hashSha256?: string;
   laboratorioAcreditado?: string;
+  /** true si el certificado fue anulado por el flujo de correccion (HU-04). */
+  anulado?: boolean;
+  reemplazadoPorNumero?: string;
 }
 
 export interface PublicVerificationDto {
@@ -70,6 +75,7 @@ export interface PublicVerificationDto {
   fechaUltimaCalibracion: string;
   fechaProximaCalibracion: string;
   codigoPrecintoSIMEL?: string;
+  certificadoAnulado?: boolean;
   ultimoCertificado?: PublicUltimoCertificadoDto;
   mensajeVerificacion: string;
 }
@@ -93,7 +99,7 @@ export const instrumentosService = {
       total = response.length;
     } else if (response && Array.isArray(response.data)) {
       rawList = response.data;
-      total = response.total;
+      total = response.meta?.total ?? response.total ?? rawList.length;
     }
 
     const items = rawList.map(mapBackendInstrumentToFrontend);
@@ -114,8 +120,12 @@ export const instrumentosService = {
     return mapBackendInstrumentToFrontend(raw);
   },
 
-  verifyPublic: async (serial: string): Promise<PublicVerificationDto> => {
-    return apiClient.get<PublicVerificationDto>(`/instrumentos/public/verificar/${encodeURIComponent(serial)}`);
+  /**
+   * Verificacion publica. Con `qr` ({cert, sig}) se valida el QR firmado (HU-05); sin el, es consulta manual.
+   */
+  verifyPublic: async (serial: string, qr?: { cert?: string; sig?: string }): Promise<PublicVerificationDto> => {
+    const params = qr?.cert ? { cert: qr.cert, sig: qr.sig ?? '' } : undefined;
+    return apiClient.get<PublicVerificationDto>(`/instrumentos/public/verificar/${encodeURIComponent(serial)}`, params);
   },
 
   create: async (data: CreateInstrumentoPayload): Promise<BackendInstrumento> => {

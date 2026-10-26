@@ -1,0 +1,13 @@
+import {api,tok} from './lib.mjs'; import fs from 'fs';
+const t=tok(); const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const mk=(serial,prox)=>({serial,marca:'QA-Marca',modelo:'QA-R2',tipo:'Bascula',categoriaExactitud:'Clase III',capacidadMaxima:150,capacidadMinima:1,unidadMedida:'kg',divisionEscala:0.05,evidenciasFotograficas:{fotoEquipo:png,fotoPrecinto:png,fotoUbicacion:png},codigoPrecintoSIMEL:'QA-R2-P-'+serial,fechaUltimaCalibracion:'2026-01-01',fechaProximaCalibracion:prox});
+const day=n=>{const d=new Date();d.setUTCHours(12,0,0,0);d.setUTCDate(d.getUTCDate()+n);return d.toISOString()};
+const a=await api('POST','/instrumentos',{token:t.tecnico,body:mk('QA-R2-NC2','2027-10-01')});
+const b=await api('POST','/instrumentos',{token:t.tecnico,body:mk('QA-R2-D5',day(5))});console.log(a.status,b.status);
+const nc=await api('POST','/calibraciones',{token:t.tecnico,body:{instrumentoId:a.body.id,laboratorioAcreditado:'QA Lab',numeroCertificado:'QA-R2-CERT-NC2',fechaCalibracion:'2026-10-24',fechaProximaCalibracion:'2027-10-24',resultado:'No Conforme',patronesUtilizados:[{codigoPatron:'QA-P1',descripcion:'x',certificadoTrazabilidad:'QA-TR-1',fechaVencimientoPatron:'2027-06-01'}],erroresMaximosPermitidos:[{cargaNominal:50,errorEncontrado:0.5,errorMaximoPermitido:0.05,cumple:false}]}});
+console.log('nc',nc.status,nc.body.id,nc.body.anulado);
+const s1=await api('POST','/alertas/scan',{token:t.tecnico});console.log('scan1',s1.body.alertasGeneradas,JSON.stringify((s1.body.alertas||[]).map(x=>[x.serial||x.instrumento?.serial,x.nivelCriticidad,x.diasRestantes])));
+const s2=await api('POST','/alertas/scan',{token:t.tecnico});console.log('scan2',s2.body.alertasGeneradas);
+const l=await api('GET','/instrumentos?limit=100&search=QA-R2',{token:t.tecnico});console.log(l.body.data.filter(i=>/QA-R2/.test(i.serial)).map(i=>i.serial+'='+i.estado).join(', '));
+fs.writeFileSync('r2d.json',JSON.stringify({nc2inst:a.body.id,nc2cert:nc.body.id,d5:b.body.id}));
+const r=await fetch('http://localhost:3000/api/calibraciones/'+nc.body.id+'/pdf');fs.writeFileSync('r2-nc2.pdf',Buffer.from(await r.arrayBuffer()));

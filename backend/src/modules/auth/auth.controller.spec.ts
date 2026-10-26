@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { AuditedThrottlerGuard } from '../../common/guards/audited-throttler.guard.js';
 import { AuthController } from './auth.controller.js';
 import { AuthService } from './auth.service.js';
 import { RolUsuario } from '../../schemas/usuario.schema.js';
@@ -36,7 +37,10 @@ describe('AuthController', () => {
           useValue: mockAuthService,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(AuditedThrottlerGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     controller = module.get<AuthController>(AuthController);
   });

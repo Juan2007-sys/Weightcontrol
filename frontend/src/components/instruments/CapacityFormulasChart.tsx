@@ -68,9 +68,9 @@ export const CapacityFormulasChart: React.FC<CapacityFormulasChartProps> = ({
           <div className="microlabel" style={{ color: 'var(--blue-600)', letterSpacing: '0.05em' }}>
             ANÁLISIS MATEMÁTICO METROLÓGICO · INTERVALO OPERATIVO Y FÓRMULAS NTC 2031
           </div>
-          <h4 style={{ margin: '2px 0 0 0', fontSize: '14px', fontWeight: 800, color: 'var(--navy-900)' }}>
+          <h2 style={{ margin: '2px 0 0 0', fontSize: '14px', fontWeight: 800, color: 'var(--navy-900)' }}>
             Gráfica de Capacidad y Variación Relativa
-          </h4>
+          </h2>
         </div>
 
         <span
@@ -204,16 +204,16 @@ export const CapacityFormulasChart: React.FC<CapacityFormulasChartProps> = ({
             padding: '12px',
           }}
         >
-          <div className="microlabel" style={{ color: '#0284C7', marginBottom: '4px' }}>
+          <div className="microlabel" style={{ color: 'var(--info-strong)', marginBottom: '4px' }}>
             1. RANGO DE CAPACIDAD
           </div>
-          <div className="font-mono" style={{ fontSize: '11px', color: '#64748B', marginBottom: '4px' }}>
+          <div className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
             R = C_max - C_min
           </div>
           <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--navy-900)' }} className="font-mono">
-            {rango} <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>{unidadMedida}</span>
+            {rango} <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>{unidadMedida}</span>
           </div>
-          <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
             {capacidadMax} - {capacidadMin} = {rango} {unidadMedida}
           </div>
         </div>
@@ -228,16 +228,16 @@ export const CapacityFormulasChart: React.FC<CapacityFormulasChartProps> = ({
             padding: '12px',
           }}
         >
-          <div className="microlabel" style={{ color: '#059669', marginBottom: '4px' }}>
+          <div className="microlabel" style={{ color: 'var(--ok)', marginBottom: '4px' }}>
             2. PROMEDIO DE CAPACIDAD
           </div>
-          <div className="font-mono" style={{ fontSize: '11px', color: '#64748B', marginBottom: '4px' }}>
+          <div className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
             C_prom = (C_max + C_min) / 2
           </div>
           <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--navy-900)' }} className="font-mono">
-            {promedio} <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>{unidadMedida}</span>
+            {promedio} <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>{unidadMedida}</span>
           </div>
-          <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
             ({capacidadMax} + {capacidadMin}) / 2 = {promedio} {unidadMedida}
           </div>
         </div>
@@ -255,13 +255,13 @@ export const CapacityFormulasChart: React.FC<CapacityFormulasChartProps> = ({
           <div className="microlabel" style={{ color: '#7C3AED', marginBottom: '4px' }}>
             3. % DIFERENCIA RESPECTO A MÁXIMA
           </div>
-          <div className="font-mono" style={{ fontSize: '11px', color: '#64748B', marginBottom: '4px' }}>
+          <div className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '4px' }}>
             P = ((C_max - C_min) / C_max) * 100
           </div>
           <div style={{ fontSize: '18px', fontWeight: 800, color: 'var(--navy-900)' }} className="font-mono">
-            {porcentajeDiferencia} <span style={{ fontSize: '12px', fontWeight: 600, color: '#64748B' }}>%</span>
+            {porcentajeDiferencia} <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-muted)' }}>%</span>
           </div>
-          <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px' }}>
+          <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>
             (({rango}) / {capacidadMax}) * 100 = {porcentajeDiferencia}%
           </div>
         </div>

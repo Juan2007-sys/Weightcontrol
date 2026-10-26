@@ -115,6 +115,7 @@ describe('CalibracionesService', () => {
   }
 
   beforeEach(async () => {
+    vi.stubEnv('QR_SIGNING_SECRET', 'secreto-de-pruebas-qr');
     vi.clearAllMocks();
 
     MockCalibracionModel.findOne = vi.fn();
@@ -194,6 +195,86 @@ describe('CalibracionesService', () => {
       expect(instCopy.save).toHaveBeenCalled();
       expect(instCopy.estado).toBe(EstadoInstrumento.VIGENTE);
       expect(mockAuditService.logEvent).toHaveBeenCalled();
+    });
+
+    it('F2/C2: calibración No Conforme => certificado anulado, instrumento Vencido con motivo NO_CONFORME', async () => {
+      const instCopy: any = { ...mockInstrumentoDoc, estado: EstadoInstrumento.VIGENTE, save: vi.fn().mockResolvedValue(true) };
+      MockInstrumentoModel.findById.mockResolvedValue(instCopy);
+      MockCalibracionModel.findOne.mockResolvedValue(null);
+      MockCalibracionModel.findById.mockReturnValue({
+        populate: vi.fn().mockReturnValue({ populate: vi.fn().mockResolvedValue(mockCalibracionDoc) }),
+      });
+      let creada: any;
+
+      const createDto = {
+        instrumentoId: '60d0fe4f5311236168a109aa',
+        laboratorioAcreditado: 'Lab',
+        numeroCertificado: 'CERT-NC-001',
+        fechaCalibracion: '2026-02-01T00:00:00.000Z',
+        fechaProximaCalibracion: '2027-02-01T00:00:00.000Z',
+        resultado: ResultadoCalibracion.NO_CONFORME,
+        patronesUtilizados: validPatrones,
+        erroresMaximosPermitidos: validErrores,
+      };
+      // Capturamos el documento construido
+      const original = (MockCalibracionModel as any);
+      const Ctor = original;
+      const instancias: any[] = [];
+      const Wrapped: any = function (this: any, dto: any) {
+        const o = new Ctor(dto);
+        instancias.push(o);
+        return o;
+      };
+      Object.assign(Wrapped, Ctor);
+      const mod = await Test.createTestingModule({
+        providers: [
+          CalibracionesService,
+          PdfGeneratorService,
+          { provide: getModelToken(Calibracion.name), useValue: Wrapped },
+          { provide: getModelToken(Instrumento.name), useValue: MockInstrumentoModel },
+          { provide: getModelToken(Certificado.name), useValue: MockCertificadoModel },
+          { provide: InstrumentosService, useValue: mockInstrumentosService },
+          { provide: AuditService, useValue: mockAuditService },
+        ],
+      }).compile();
+      const svc = mod.get(CalibracionesService);
+
+      await svc.create(createDto as any, 'user_tecnico_123');
+      creada = instancias[0];
+
+      expect(creada.anulado).toBe(true);
+      expect(creada.motivoAnulacion).toMatch(/No Conforme/i);
+      expect(instCopy.estado).toBe(EstadoInstrumento.VENCIDO);
+      expect(instCopy.motivoVencimiento).toBe('NO_CONFORME');
+    });
+
+    it('F2: una calibración Conforme posterior limpia el motivo NO_CONFORME', async () => {
+      const instCopy: any = {
+        ...mockInstrumentoDoc,
+        estado: EstadoInstrumento.VENCIDO,
+        motivoVencimiento: 'NO_CONFORME',
+        save: vi.fn().mockResolvedValue(true),
+      };
+      MockInstrumentoModel.findById.mockResolvedValue(instCopy);
+      MockCalibracionModel.findOne.mockResolvedValue(null);
+      MockCalibracionModel.findById.mockReturnValue({
+        populate: vi.fn().mockReturnValue({ populate: vi.fn().mockResolvedValue(mockCalibracionDoc) }),
+      });
+      await service.create(
+        {
+          instrumentoId: '60d0fe4f5311236168a109aa',
+          laboratorioAcreditado: 'Lab',
+          numeroCertificado: 'CERT-OK-002',
+          fechaCalibracion: '2026-02-01T00:00:00.000Z',
+          fechaProximaCalibracion: '2027-02-01T00:00:00.000Z',
+          resultado: ResultadoCalibracion.CONFORME,
+          patronesUtilizados: validPatrones,
+          erroresMaximosPermitidos: validErrores,
+        } as any,
+        'user_tecnico_123',
+      );
+      expect(instCopy.motivoVencimiento).toBeUndefined();
+      expect(instCopy.estado).toBe(EstadoInstrumento.VIGENTE);
     });
 
     it('HU-04: debe bloquear emisión si falta patronesUtilizados (completitud)', async () => {
@@ -329,6 +410,49 @@ describe('CalibracionesService', () => {
       expect(pdfBuffer).toBeInstanceOf(Buffer);
       expect(pdfBuffer.toString('utf-8')).toContain('%PDF-1.4');
       expect(pdfBuffer.toString('utf-8')).toContain('CERT-2026-001');
+    });
+  });
+
+  describe('findAll (orden y paginación HU-04)', () => {
+    const buildChain = () => {
+      const chain: any = {};
+      chain.sort = vi.fn().mockReturnValue(chain);
+      chain.skip = vi.fn().mockReturnValue(chain);
+      chain.limit = vi.fn().mockReturnValue(chain);
+      chain.populate = vi.fn().mockReturnValue(chain);
+      chain.exec = vi.fn().mockResolvedValue([mockCalibracionDoc]);
+      MockCalibracionModel.find.mockReturnValue(chain);
+      MockCalibracionModel.countDocuments.mockReturnValue({ exec: vi.fn().mockResolvedValue(18) });
+      return chain;
+    };
+
+    it('ordena por fecha de emisión descendente por defecto (más reciente primero)', async () => {
+      const chain = buildChain();
+      await service.findAll({} as any);
+      expect(chain.sort).toHaveBeenCalledWith({ createdAt: -1, _id: -1 });
+    });
+
+    it('respeta sortOrder asc y rechaza campos de orden no permitidos', async () => {
+      const chain = buildChain();
+      await service.findAll({ sortOrder: 'asc' } as any);
+      expect(chain.sort).toHaveBeenLastCalledWith({ createdAt: 1, _id: 1 });
+      await service.findAll({ sortBy: 'passwordHash' } as any);
+      expect(chain.sort).toHaveBeenLastCalledWith({ createdAt: -1, _id: -1 });
+    });
+
+    it('pagina con skip/limit y devuelve meta.total, totalPages y banderas', async () => {
+      const chain = buildChain();
+      const res = await service.findAll({ page: 2, limit: 10 } as any);
+      expect(chain.skip).toHaveBeenCalledWith(10);
+      expect(chain.limit).toHaveBeenCalledWith(10);
+      expect(res.meta).toMatchObject({
+        total: 18,
+        page: 2,
+        limit: 10,
+        totalPages: 2,
+        hasNextPage: false,
+        hasPreviousPage: true,
+      });
     });
   });
 

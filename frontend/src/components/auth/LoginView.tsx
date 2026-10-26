@@ -25,9 +25,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
     } else if (newProfile === 'inspector') {
       setEmail('inspector@sic.gov.co');
       setPassword('Inspector123456!');
-    } else if (newProfile === 'oec') {
-      setEmail('laboratorio@onac.org.co');
-      setPassword('Laboratorio123456!');
     }
   };
 
@@ -89,9 +86,9 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             {/* Tarjeta de Destinatarios */}
             <div className="gov-card" style={{ padding: '24px', backgroundColor: '#FFFFFF' }}>
-              <div className="microlabel" style={{ color: 'var(--navy-900)', marginBottom: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
+              <h2 className="microlabel" style={{ color: 'var(--navy-900)', marginBottom: '14px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
                 DESTINATARIOS AUTORIZADOS DEL PUNTO DE ACCESO
-              </div>
+              </h2>
 
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <li style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
@@ -148,7 +145,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 border: '1px solid #1E293B',
               }}
             >
-              <div
+              <h2
                 className="microlabel font-mono"
                 style={{
                   color: '#38BDF8',
@@ -158,7 +155,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                 }}
               >
                 PROTOCOLO DE VERIFICACIÓN OBLIGATORIA (SEGURIDAD SICM)
-              </div>
+              </h2>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', fontSize: '12px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -239,13 +236,14 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
           {/* Columna Derecha: Formulario Técnico + Banner Legal Ámbar */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div className="gov-card" style={{ padding: '28px', backgroundColor: '#FFFFFF' }}>
-              <div className="microlabel" style={{ color: 'var(--navy-900)', marginBottom: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
+              <h2 className="microlabel" style={{ color: 'var(--navy-900)', marginBottom: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
                 CREDENCIALES DE AUTENTICACIÓN INSTITUCIONAL
-              </div>
+              </h2>
 
-              <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <form onSubmit={handleSubmit} aria-label="Formulario de inicio de sesión" style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
                 {error && (
                   <div
+                    role="alert"
                     style={{
                       backgroundColor: 'var(--danger-bg)',
                       border: '1px solid var(--danger)',
@@ -279,7 +277,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     }}
                   >
                     <option value="inspector">Auditor / Inspector de Vigilancia SIC</option>
-                    <option value="oec">Organismo Evaluador de la Conformidad (OEC-ONAC)</option>
                     <option value="tecnico">Técnico Metrólogo Certificado (RUMP)</option>
                     <option value="admin">Administrador Central del Sistema</option>
                   </select>

@@ -33,8 +33,9 @@ export class Alerta {
   @Prop({ required: true })
   fechaProximaCalibracion: Date;
 
-  @Prop({ required: true })
-  diasRestantes: number;
+  // null cuando no aplica un conteo de días (p. ej. VENCIDA por calibración No Conforme).
+  @Prop({ type: Number, required: false, default: null })
+  diasRestantes: number | null;
 
   @Prop({
     type: String,

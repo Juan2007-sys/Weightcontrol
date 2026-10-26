@@ -6,15 +6,28 @@ import { InstrumentosService } from './instrumentos.service.js';
 import { BasculaValidator } from './validators/bascula.validator.js';
 import { PesaValidator } from './validators/pesa.validator.js';
 import { DinamometroValidator } from './validators/dinamometro.validator.js';
-import { ValidationEngineService } from './validators/validation-engine.service.js';
+import {
+  INSTRUMENTO_VALIDATORS,
+  ValidationEngineService,
+} from './validators/validation-engine.service.js';
+
+// Registro de validators (M1): para un tipo nuevo basta su clase y una linea aqui.
+export const INSTRUMENTO_VALIDATOR_CLASSES = [
+  BasculaValidator,
+  PesaValidator,
+  DinamometroValidator,
+];
 
 @Module({
   imports: [DatabaseModule, AuditModule],
   controllers: [InstrumentosController],
   providers: [
-    BasculaValidator,
-    PesaValidator,
-    DinamometroValidator,
+    ...INSTRUMENTO_VALIDATOR_CLASSES,
+    {
+      provide: INSTRUMENTO_VALIDATORS,
+      useFactory: (...validators: unknown[]) => validators,
+      inject: INSTRUMENTO_VALIDATOR_CLASSES,
+    },
     ValidationEngineService,
     InstrumentosService,
   ],

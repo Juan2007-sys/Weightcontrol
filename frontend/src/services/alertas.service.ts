@@ -28,7 +28,7 @@ export const alertasService = {
     if (Array.isArray(res)) {
       return { data: res, total: res.length };
     }
-    return { data: res?.data || [], total: res?.total || 0 };
+    return { data: res?.data || [], total: res?.meta?.total ?? res?.total ?? (res?.data?.length || 0) };
   },
 
   getStats: async (): Promise<AlertaStats> => {

@@ -99,6 +99,28 @@ export class Calibracion {
 
   @Prop({ trim: true, index: true })
   codigoFolio?: string;
+
+  // --- Flujo de correccion formal (HU-04). El contenido sellado nunca se edita:
+  // solo estos campos de estado se escriben, y unicamente desde `corregir()`.
+  @Prop({ default: false, index: true })
+  anulado: boolean;
+
+  @Prop({ trim: true })
+  motivoAnulacion?: string;
+
+  @Prop()
+  fechaAnulacion?: Date;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Usuario' })
+  anuladoPor?: Usuario | string;
+
+  /** Certificado nuevo que reemplaza a este (presente solo si fue anulado). */
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Calibracion' })
+  certificadoReemplazadoPor?: Calibracion | string;
+
+  /** Certificado anulado al que este documento reemplaza. */
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Calibracion' })
+  reemplazaA?: Calibracion | string;
 }
 
 export const CalibracionSchema = SchemaFactory.createForClass(Calibracion);

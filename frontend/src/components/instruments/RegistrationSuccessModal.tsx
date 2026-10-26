@@ -3,6 +3,8 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
 import { CheckIcon, SearchIcon, FileTextIcon, PlusIcon, XIcon, ShieldCheckIcon } from '../common/Icons';
+import { formatDateTime } from '../../utils/dates';
+import { useDialogA11y } from '../../utils/useDialogA11y';
 
 export interface RegistrationSuccessData {
   id?: string;
@@ -41,19 +43,22 @@ export const RegistrationSuccessModal: React.FC<RegistrationSuccessModalProps> =
   onRegisterAnother,
   onClose,
 }) => {
+  const dialogRef = useDialogA11y<HTMLDivElement>(isOpen && !!data, onClose);
+
   if (!isOpen || !data) return null;
 
-  const registrationDate = data.createdAt
-    ? new Date(data.createdAt).toLocaleString('es-CO')
-    : new Date().toLocaleString('es-CO');
+  const registrationDate = formatDateTime(data.createdAt ?? new Date());
 
   const verificationUrl = buildVerificationUrl({ serial: data.serial });
 
   return (
     <AnimatePresence>
       <div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
+        aria-label="Instrumento radicado"
         style={{
           position: 'fixed',
           inset: 0,

@@ -29,11 +29,21 @@ import { Public } from '../../common/decorators/public.decorator.js';
 import { RolUsuario } from '../../schemas/usuario.schema.js';
 
 import { PublicVerificationDto } from './dto/public-verification.dto.js';
+import { toPublicListItem } from './dto/public-list-item.js';
 
 @Controller('instrumentos')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class InstrumentosController {
   constructor(private readonly instrumentosService: InstrumentosService) {}
+
+  private ctx(req: Request, cert?: string, sig?: string) {
+    return {
+      cert,
+      sig,
+      ipAddress: req?.ip || req?.socket?.remoteAddress,
+      userAgent: req?.headers?.['user-agent'] as string | undefined,
+    };
+  }
 
   @Post()
   @Roles(RolUsuario.ADMIN, RolUsuario.TECNICO, RolUsuario.INSTITUCION_ACREDITACION)
@@ -52,8 +62,15 @@ export class InstrumentosController {
   @Get()
   async findAll(
     @Query() query: QueryInstrumentosDto,
+    @CurrentUser() user?: unknown,
   ): Promise<PaginatedResponseDto<InstrumentoResponseDto>> {
-    return this.instrumentosService.findAll(query);
+    if (user) {
+      // Con sesion valida (JwtAuthGuard opcional en rutas @Public): DTO completo.
+      return this.instrumentosService.findAll(query);
+    }
+    // Sin sesion (Habeas Data, HU-05): sin propietario, creadoPor, evidencias ni ubicacion.
+    const result = await this.instrumentosService.findAll(query, { publico: true });
+    return { ...result, data: result.data.map(toPublicListItem) };
   }
 
   @Public()
@@ -66,30 +83,40 @@ export class InstrumentosController {
   @Get('public/search')
   async publicSearch(
     @Query('serial') serial: string,
+    @Req() req: Request,
+    @Query('cert') cert?: string,
+    @Query('sig') sig?: string,
   ): Promise<PublicVerificationDto> {
-    return this.instrumentosService.verifyPublic(serial);
+    return this.instrumentosService.verifyPublic(serial, this.ctx(req, cert, sig));
   }
 
   @Public()
   @Get('public/verificar/:serial')
   async publicVerify(
     @Param('serial') serial: string,
+    @Req() req: Request,
+    @Query('cert') cert?: string,
+    @Query('sig') sig?: string,
   ): Promise<PublicVerificationDto> {
-    return this.instrumentosService.verifyPublic(serial);
+    return this.instrumentosService.verifyPublic(serial, this.ctx(req, cert, sig));
   }
 
   @Public()
   @Get('serial/:serial')
   async findBySerial(
     @Param('serial') serial: string,
+    @Req() req: Request,
+    @Query('cert') cert?: string,
+    @Query('sig') sig?: string,
   ): Promise<PublicVerificationDto> {
-    return this.instrumentosService.verifyPublic(serial);
+    return this.instrumentosService.verifyPublic(serial, this.ctx(req, cert, sig));
   }
 
   @Public()
   @Get(':id')
-  async findById(@Param('id') id: string): Promise<InstrumentoResponseDto> {
-    return this.instrumentosService.findById(id);
+  async findById(@Param('id') id: string, @Req() req: Request): Promise<PublicVerificationDto> {
+    // Endpoint publico: solo DTO sanitizado (HU-05, Habeas Data). Sin propietario/creadoPor/evidencias.
+    return this.instrumentosService.verifyPublicById(id, this.ctx(req));
   }
 
   @Put(':id')

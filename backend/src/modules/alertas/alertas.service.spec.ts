@@ -131,6 +131,62 @@ describe('AlertasService (HU-05 Motor de Alertas & Notificaciones)', () => {
       expect(mockInstrumentoDoc.estado).toBe(EstadoInstrumento.POR_VENCER);
       expect(mockAuditService.logEvent).toHaveBeenCalled();
     });
+
+    it('F2: NO revierte Vencido a Vigente si el vencimiento se debe a una calibración No Conforme', async () => {
+      const lejos = new Date();
+      lejos.setFullYear(lejos.getFullYear() + 1);
+      const instNC: any = {
+        ...mockInstrumentoDoc,
+        estado: EstadoInstrumento.VENCIDO,
+        motivoVencimiento: 'NO_CONFORME',
+        fechaProximaCalibracion: lejos,
+        save: vi.fn().mockResolvedValue(true),
+      };
+      MockInstrumentoModel.find.mockReturnValue({ exec: vi.fn().mockResolvedValue([instNC]) });
+      MockAlertaModel.findOne.mockResolvedValue(null);
+
+      await service.scanAlertas('user_admin_123');
+
+      expect(instNC.estado).toBe(EstadoInstrumento.VENCIDO);
+    });
+
+    it('R3: la alerta VENCIDA por No Conforme lleva diasRestantes null y un mensaje que no habla de días', async () => {
+      const lejos = new Date();
+      lejos.setFullYear(lejos.getFullYear() + 1);
+      const instNC: any = {
+        ...mockInstrumentoDoc,
+        estado: EstadoInstrumento.VENCIDO,
+        motivoVencimiento: 'NO_CONFORME',
+        fechaProximaCalibracion: lejos,
+        save: vi.fn().mockResolvedValue(true),
+      };
+      MockInstrumentoModel.find.mockReturnValue({ exec: vi.fn().mockResolvedValue([instNC]) });
+      MockAlertaModel.findOne.mockResolvedValue(null);
+
+      await service.scanAlertas('user_admin_123');
+
+      const arg = mockNotificadorEngine.dispatch.mock.calls.at(-1)![0];
+      expect(arg.diasRestantes).toBeNull();
+      expect(arg.mensaje).toContain('NO CONFORME');
+      expect(arg.mensaje).not.toMatch(/\d+ día/);
+    });
+
+    it('F2: un instrumento Vencido sin motivo NO_CONFORME sigue recalculándose por fecha', async () => {
+      const lejos = new Date();
+      lejos.setFullYear(lejos.getFullYear() + 1);
+      const inst: any = {
+        ...mockInstrumentoDoc,
+        estado: EstadoInstrumento.VENCIDO,
+        fechaProximaCalibracion: lejos,
+        save: vi.fn().mockResolvedValue(true),
+      };
+      MockInstrumentoModel.find.mockReturnValue({ exec: vi.fn().mockResolvedValue([inst]) });
+      MockAlertaModel.findOne.mockResolvedValue(null);
+
+      await service.scanAlertas('user_admin_123');
+
+      expect(inst.estado).toBe(EstadoInstrumento.VIGENTE);
+    });
   });
 
   describe('findAll', () => {

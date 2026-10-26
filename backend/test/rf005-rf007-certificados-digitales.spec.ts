@@ -69,6 +69,7 @@ describe('🔴 RF005 & RF007 — Certificados Digitales y Calibraciones Metroló
       mockInstrumentoModel as any,
       mockInstrumentosService as any,
       mockAuditService as any,
+      {} as any,
     );
   });
 

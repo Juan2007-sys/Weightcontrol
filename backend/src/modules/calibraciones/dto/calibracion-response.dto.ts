@@ -19,6 +19,11 @@ export interface CalibracionResponseDto {
   incertidumbreExpandida?: string;
   observaciones?: string;
   archivoInformeUrl?: string;
+  anulado?: boolean;
+  motivoAnulacion?: string;
+  fechaAnulacion?: Date;
+  certificadoReemplazadoPor?: string;
+  reemplazaA?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

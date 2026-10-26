@@ -6,6 +6,7 @@ import { RegisterCalibrationModal } from '../calibration/RegisterCalibrationModa
 import { PdfCertificateViewerModal } from '../common/PdfCertificateViewerModal';
 import { useAuth } from '../../context/AuthContext';
 import { toast } from 'sonner';
+import { formatCalendarDate } from '../../utils/dates';
 
 interface ValidationItem {
   id: string;
@@ -15,9 +16,30 @@ interface ValidationItem {
   instrumento: string;
   empStatus: string;
   fechaEnsayo: string;
-  estado: 'PENDIENTE EVALUACIÓN' | 'APROBADA' | 'OBSERVADA';
+  estado: 'PENDIENTE EVALUACIÓN' | 'APROBADA' | 'OBSERVADA' | 'ANULADA';
   pdfAvailable?: boolean;
+  /** Serial del equipo; undefined si el instrumento fue eliminado. */
+  serial?: string;
 }
+
+const PAGE_SIZE = 10;
+
+/** Serial del instrumento poblado, o undefined si fue borrado / no viene poblado. */
+export const serialDeInstrumento = (inst: unknown): string | undefined =>
+  inst && typeof inst === 'object' && typeof (inst as { serial?: unknown }).serial === 'string'
+    ? (inst as { serial: string }).serial || undefined
+    : undefined;
+
+/** Nombre legible del equipo; los certificados de instrumentos borrados se marcan, no se ocultan. */
+export const describirInstrumento = (inst: unknown): string => {
+  if (inst && typeof inst === 'object') {
+    const i = inst as { marca?: string; modelo?: string; serial?: string };
+    const nombre = `${i.marca || ''} ${i.modelo || ''}`.trim();
+    return nombre || (i.serial ? `Equipo serie ${i.serial}` : 'Equipo sin descripción');
+  }
+  // Referencia nula (instrumento eliminado) o id sin poblar.
+  return 'Equipo eliminado (certificado conservado por trazabilidad)';
+};
 
 interface AccreditationViewProps {
   instruments?: MetrologicalInstrument[];
@@ -29,20 +51,29 @@ export const AccreditationView: React.FC<AccreditationViewProps> = ({ instrument
   const [showCalibrationModal, setShowCalibrationModal] = useState(false);
   const [viewingCertItem, setViewingCertItem] = useState<ValidationItem | null>(null);
 
-  const loadCalibraciones = async () => {
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [issuedInSession, setIssuedInSession] = useState(false);
+
+  const loadCalibraciones = async (targetPage: number = page) => {
     try {
-      const res = await calibracionesService.getAll();
+      const res = await calibracionesService.getAll({ page: targetPage, limit: PAGE_SIZE });
+      setTotal(res.total);
+      setTotalPages(res.totalPages);
       if (res.data && res.data.length > 0) {
         const mapped: ValidationItem[] = res.data.map((c) => ({
           id: c.id || c._id || c.numeroCertificado,
           actaNumero: c.numeroCertificado,
           oec: c.codigoPrecintoSIMEL || 'ONAC-18-LAB-042',
           laboratorio: c.laboratorioAcreditado,
-          instrumento: typeof c.instrumento === 'object' && c.instrumento ? `${c.instrumento.marca || ''} ${c.instrumento.modelo || ''}` : `Equipo ${c.instrumento}`,
-          empStatus: c.observaciones || `Dictamen: ${c.resultado} (Incertidumbre: ${c.incertidumbreExpandida || '±0.5e'})`,
-          fechaEnsayo: new Date(c.fechaCalibracion).toLocaleDateString('es-CO'),
-          estado: c.resultado === 'Conforme' ? 'APROBADA' : 'OBSERVADA',
+          instrumento: describirInstrumento(c.instrumento),
+          empStatus: (c.anulado ? `ANULADO${c.motivoAnulacion ? ` (${c.motivoAnulacion})` : ''}. ` : '') + (c.observaciones || `Dictamen: ${c.resultado} (Incertidumbre: ${c.incertidumbreExpandida || '±0.5e'})`),
+          fechaEnsayo: formatCalendarDate(c.fechaCalibracion),
+          // Un certificado anulado nunca se muestra como aprobado (trazabilidad).
+          estado: c.anulado ? 'ANULADA' : c.resultado === 'Conforme' ? 'APROBADA' : 'OBSERVADA',
           pdfAvailable: true,
+          serial: serialDeInstrumento(c.instrumento),
         }));
         setItems(mapped);
       }
@@ -52,8 +83,25 @@ export const AccreditationView: React.FC<AccreditationViewProps> = ({ instrument
   };
 
   useEffect(() => {
-    loadCalibraciones();
-  }, []);
+    loadCalibraciones(page);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page]);
+
+  /** Cierra el modal de emisión; si se emitió un certificado vuelve a la página 1 (más recientes primero). */
+  const handleCloseCalibrationModal = () => {
+    setShowCalibrationModal(false);
+    if (issuedInSession) {
+      setIssuedInSession(false);
+      if (page === 1) loadCalibraciones(1);
+      else setPage(1);
+    }
+  };
+
+  const pageNumbers = (() => {
+    const start = Math.max(1, Math.min(page - 2, totalPages - 4));
+    const end = Math.min(totalPages, start + 4);
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  })();
 
   const handleAction = (id: string, newStatus: 'APROBADA' | 'OBSERVADA') => {
     setItems((prev) =>
@@ -174,7 +222,7 @@ export const AccreditationView: React.FC<AccreditationViewProps> = ({ instrument
                     {item.empStatus}
                   </td>
                   <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                    <span className={`status-pill ${item.estado === 'APROBADA' ? 'ok' : item.estado === 'OBSERVADA' ? 'warn' : 'info'}`}>
+                    <span className={`status-pill ${item.estado === 'APROBADA' ? 'ok' : item.estado === 'OBSERVADA' ? 'warn' : item.estado === 'ANULADA' ? 'danger' : 'info'}`}>
                       {item.estado}
                     </span>
                   </td>
@@ -235,6 +283,49 @@ export const AccreditationView: React.FC<AccreditationViewProps> = ({ instrument
           </table>
         </div>
 
+        {/* Paginación (HU-04): más recientes primero; controles accesibles por teclado */}
+        <nav
+          aria-label="Paginación de actas y certificados"
+          style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', marginTop: '12px', fontSize: '13px' }}
+        >
+          <span aria-live="polite">
+            Página {page} de {totalPages} · {total} certificado{total === 1 ? '' : 's'}
+          </span>
+          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <button
+              type="button"
+              className="btn-gov-compact"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              aria-label="Página anterior"
+            >
+              Anterior
+            </button>
+            {pageNumbers.map((n) => (
+              <button
+                key={n}
+                type="button"
+                className="btn-gov-compact"
+                onClick={() => setPage(n)}
+                aria-label={`Ir a la página ${n}`}
+                aria-current={n === page ? 'page' : undefined}
+                style={n === page ? { fontWeight: 800, backgroundColor: 'var(--navy-900)', color: '#FFFFFF' } : undefined}
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="btn-gov-compact"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              aria-label="Página siguiente"
+            >
+              Siguiente
+            </button>
+          </div>
+        </nav>
+
         {/* Modal de Previsualización Oficial de Certificado PDF */}
         {viewingCertItem && (
           <PdfCertificateViewerModal
@@ -242,6 +333,7 @@ export const AccreditationView: React.FC<AccreditationViewProps> = ({ instrument
             certIdOrFolio={viewingCertItem.actaNumero}
             title={`Certificado Oficial de Calibración · ${viewingCertItem.actaNumero}`}
             metadata={{
+              ...(viewingCertItem.serial ? { serial: viewingCertItem.serial } : {}),
               estado: viewingCertItem.estado,
               laboratorioOEC: viewingCertItem.laboratorio,
               fechaEmision: viewingCertItem.fechaEnsayo,
@@ -255,11 +347,8 @@ export const AccreditationView: React.FC<AccreditationViewProps> = ({ instrument
         {showCalibrationModal && (
           <RegisterCalibrationModal
             instruments={instruments}
-            onClose={() => setShowCalibrationModal(false)}
-            onSuccess={() => {
-              setShowCalibrationModal(false);
-              loadCalibraciones();
-            }}
+            onClose={handleCloseCalibrationModal}
+            onSuccess={() => setIssuedInSession(true)}
           />
         )}
       </div>

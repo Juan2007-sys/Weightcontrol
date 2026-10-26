@@ -22,12 +22,12 @@ export const GovFooter: React.FC = () => {
               </span>
               <span>SUPERINTENDENCIA DE INDUSTRIA Y COMERCIO · REPÚBLICA DE COLOMBIA</span>
             </div>
-            <p style={{ marginTop: '6px', color: '#64748B', fontSize: '11px', maxWidth: '600px' }}>
+            <p style={{ marginTop: '6px', color: '#94A3B8', fontSize: '11px', maxWidth: '600px' }}>
               Autoridad Nacional de Metrología Legal y Protección al Consumidor. Sistema Integrado de Control Metrológico (SICM-COL). Sede Principal: Carrera 13 No. 27 - 00, Bogotá D.C., Colombia.
             </p>
           </div>
 
-          <div style={{ textAlign: 'right', fontSize: '11px', color: '#64748B' }}>
+          <div style={{ textAlign: 'right', fontSize: '11px', color: '#94A3B8' }}>
             <div>Línea Gratuita Nacional: <strong>01 8000 910165</strong> | Conmutador: <strong>(601) 587 00 00</strong></div>
             <div>Horario de Radicación: Lunes a Viernes 8:00 a.m. a 4:30 p.m. (NIST UTC-5)</div>
             <div className="font-mono microlabel-sm" style={{ color: '#94A3B8', marginTop: '4px' }}>
@@ -46,7 +46,7 @@ export const GovFooter: React.FC = () => {
             flexWrap: 'wrap',
             gap: '12px',
             fontSize: '11px',
-            color: '#64748B',
+            color: '#94A3B8',
           }}
         >
           <div>

@@ -67,7 +67,7 @@ describe('CalibracionesController', () => {
     };
     const req = { ip: '127.0.0.1', headers: { 'user-agent': 'Vitest' }, socket: {} } as any;
 
-    const result = await controller.create(createDto, 'user_1', req);
+    const result = await controller.create(createDto as any, 'user_1', req);
 
     expect(result).toEqual(mockCalibracion);
     expect(mockService.create).toHaveBeenCalledWith(createDto, 'user_1', '127.0.0.1', 'Vitest');

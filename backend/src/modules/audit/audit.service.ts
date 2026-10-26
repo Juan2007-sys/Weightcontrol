@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import {
   TrazabilidadEvento,
   TrazabilidadEventoDocument,
@@ -22,12 +24,38 @@ export class CreateAuditLogDto {
 }
 
 export class QueryAuditDto {
+  @IsOptional()
+  @IsString()
   entityAffected?: EntidadAfectada | string;
+
+  @IsOptional()
+  @IsString()
   actionType?: TipoAccionAuditoria | string;
+
+  @IsOptional()
+  @IsString()
   userId?: string;
+
+  @IsOptional()
+  @IsString()
   identifier?: string;
+
+  @IsOptional()
+  @IsString()
   search?: string;
+
+  /** El servicio acota a 100; se acepta hasta 1000 para no rechazar clientes que piden mas. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1000)
   limit?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   page?: number;
 }
 

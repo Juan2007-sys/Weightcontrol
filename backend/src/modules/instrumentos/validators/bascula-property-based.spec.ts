@@ -26,7 +26,7 @@ describe('BasculaValidator · Property-Based Testing (fast-check / NTC 2031)', (
           const max = Math.min(valA, valB);
           const min = Math.max(valA, valB); // garantizamos min >= max
 
-          const result = validator.validate({
+          const result = validator.validate(<any>{
             tipo: TipoInstrumento.BASCULA,
             categoriaExactitud: CategoriaExactitud.CLASE_III,
             capacidadMaxima: max,
@@ -53,7 +53,7 @@ describe('BasculaValidator · Property-Based Testing (fast-check / NTC 2031)', (
           const divisionEscala = maxKg / n;
           const minKg = maxKg * 0.01; // Min siempre < Max
 
-          const result = validator.validate({
+          const result = validator.validate(<any>{
             tipo: TipoInstrumento.BASCULA,
             categoriaExactitud: CategoriaExactitud.CLASE_III,
             capacidadMaxima: maxKg,
@@ -80,7 +80,7 @@ describe('BasculaValidator · Property-Based Testing (fast-check / NTC 2031)', (
           const divisionEscala = maxKg / n;
           const minKg = maxKg * 0.001;
 
-          const result = validator.validate({
+          const result = validator.validate(<any>{
             tipo: TipoInstrumento.BASCULA,
             categoriaExactitud: CategoriaExactitud.CLASE_I,
             capacidadMaxima: maxKg,
@@ -107,7 +107,7 @@ describe('BasculaValidator · Property-Based Testing (fast-check / NTC 2031)', (
           const divisionEscala = maxKg / n;
           const minKg = maxKg * 0.05;
 
-          const result = validator.validate({
+          const result = validator.validate(<any>{
             tipo: TipoInstrumento.BASCULA,
             categoriaExactitud: CategoriaExactitud.CLASE_IIII,
             capacidadMaxima: maxKg,
@@ -133,7 +133,7 @@ describe('BasculaValidator · Property-Based Testing (fast-check / NTC 2031)', (
         (missingField, emptyVal) => {
           const invalidPhotos = { ...validPhotos, [missingField]: emptyVal };
 
-          const result = validator.validate({
+          const result = validator.validate(<any>{
             tipo: TipoInstrumento.BASCULA,
             categoriaExactitud: CategoriaExactitud.CLASE_III,
             capacidadMaxima: 30,

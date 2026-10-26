@@ -36,6 +36,36 @@ export interface CertificadoPdfData {
     cumple: boolean;
   }>;
   verificationUrl: string;
+  /** Certificado anulado por el flujo de correccion (HU-04): se estampa ANULADO. */
+  anulado?: boolean;
+  reemplazadoPorNumero?: string;
+}
+
+/**
+ * Texto del banner de dictamen. Un certificado anulado o con resultado No Conforme nunca
+ * debe leerse como "CONFORME (APTO)": se muestra el dictamen real y la marca de anulacion.
+ */
+export function textoDictamen(data: { resultado?: string; anulado?: boolean }): {
+  texto: string;
+  verde: boolean;
+} {
+  const r = (data.resultado || '').trim().toLowerCase();
+  const conforme = r === 'conforme';
+  if (data.anulado) {
+    return {
+      texto: conforme
+        ? 'DICTAMEN METROLÓGICO: CERTIFICADO ANULADO (SIN VALIDEZ; RESULTADO ORIGINAL: CONFORME)'
+        : 'DICTAMEN METROLÓGICO: NO CONFORME - CERTIFICADO ANULADO (RETIRADO DE SERVICIO)',
+      verde: false,
+    };
+  }
+  if (conforme) {
+    return { texto: 'DICTAMEN METROLÓGICO: CONFORME (APTO PARA USO LEGAL Y TRANSACCIONES)', verde: true };
+  }
+  return {
+    texto: 'DICTAMEN METROLÓGICO: NO CONFORME (MEDIDA CAUTELAR / RETIRADO DE SERVICIO)',
+    verde: false,
+  };
 }
 
 @Injectable()
@@ -156,8 +186,8 @@ export class PdfGeneratorService {
       doc.fillColor('#1E40AF').font('Helvetica-Bold').fontSize(8.5).text(data.numeroCertificado, boxX + 8, boxY + 20);
       doc.fillColor('#475569').font('Courier-Bold').fontSize(6.5).text(`FOLIO: ${data.codigoFolio}`, boxX + 8, boxY + 31);
       doc.fillColor('#334155').font('Helvetica').fontSize(6.5).text(`EMISIÓN: ${fechaEmisionStr}   |   VENCE: ${fechaVenceStr}`, boxX + 8, boxY + 41);
-      doc.fillColor(isConforme ? '#065F46' : '#991B1B').font('Helvetica-Bold').fontSize(6.5).text(
-        `ESTADO: ${isConforme ? 'VIGENTE (APTO)' : 'NO CONFORME'}`,
+      doc.fillColor(isConforme && !data.anulado ? '#065F46' : '#991B1B').font('Helvetica-Bold').fontSize(6.5).text(
+        `ESTADO: ${data.anulado ? 'ANULADO (NO VIGENTE)' : isConforme ? 'VIGENTE (APTO)' : 'NO CONFORME'}`,
         boxX + 8,
         boxY + 50,
       );
@@ -166,29 +196,33 @@ export class PdfGeneratorService {
       const statusY = 88;
       const statusW = 539.28;
       const statusH = 22;
+      const dictamen = textoDictamen(data);
+      const bannerVerde = dictamen.verde;
       doc.roundedRect(28, statusY, statusW, statusH, 3)
-        .fillColor(isConforme ? '#ECFDF5' : '#FEF2F2')
+        .fillColor(bannerVerde ? '#ECFDF5' : '#FEF2F2')
         .fill();
       doc.roundedRect(28, statusY, statusW, statusH, 3)
         .lineWidth(1)
-        .strokeColor(isConforme ? '#059669' : '#DC2626')
+        .strokeColor(bannerVerde ? '#059669' : '#DC2626')
         .stroke();
 
-      doc.fillColor(isConforme ? '#065F46' : '#991B1B')
+      // El dictamen ocupa solo la zona izquierda (hasta x=395) para no solaparse con la
+      // reglamentación alineada a la derecha; se reduce la fuente hasta que quepa en una línea.
+      const dictamenMaxW = 355;
+      let dictamenSize = 9;
+      doc.font('Helvetica-Bold');
+      while (dictamenSize > 5.5 && doc.fontSize(dictamenSize).widthOfString(dictamen.texto) > dictamenMaxW) {
+        dictamenSize -= 0.25;
+      }
+      doc.fillColor(bannerVerde ? '#065F46' : '#991B1B')
         .font('Helvetica-Bold')
-        .fontSize(9)
-        .text(
-          isConforme
-            ? '✓ DICTAMEN METROLÓGICO: CONFORME (APTO PARA USO LEGAL Y TRANSACCIONES)'
-            : '✕ DICTAMEN METROLÓGICO: NO CONFORME (MEDIDA CAUTELAR / RETIRADO DE SERVICIO)',
-          38,
-          statusY + 6,
-        );
+        .fontSize(dictamenSize)
+        .text(dictamen.texto, 38, statusY + 11 - dictamenSize / 2, { width: dictamenMaxW, lineBreak: false });
 
-      doc.fillColor(isConforme ? '#047857' : '#B91C1C')
+      doc.fillColor(bannerVerde ? '#047857' : '#B91C1C')
         .font('Helvetica')
         .fontSize(7)
-        .text('Reglamentación: NTC 2031 / OIML R 76-1', 400, statusY + 7, { align: 'right', width: 155 });
+        .text('Reglamentación: NTC 2031 / OIML R 76-1', 400, statusY + 7, { align: 'right', width: 155, lineBreak: false });
 
       // --- F. SECCIÓN 1: CARACTERÍSTICAS DEL INSTRUMENTO (Y: 116) ---
       const sec1Y = 116;
@@ -438,6 +472,17 @@ export class PdfGeneratorService {
       doc.fillColor('#94A3B8').font('Helvetica').fontSize(6);
       doc.text('Superintendencia de Industria y Comercio · Sede Central: Cra. 13 # 27-00, Bogotá D.C. · www.sic.gov.co', 28, footerY + 4);
       doc.text('Sistema WeightControl v4.12.8 · NODO-BOG-01 · Trazable Hora Legal INM UTC-5', 28, footerY + 4, { align: 'right', width: statusW });
+
+      if (data.anulado) {
+        doc.save();
+        doc.rotate(-35, { origin: [297, 420] });
+        doc.fillColor('#B91C1C').opacity(0.18).font('Helvetica-Bold').fontSize(96).text('ANULADO', 60, 380, { width: 480, align: 'center', lineBreak: false });
+        doc.restore();
+        doc.opacity(1);
+        if (data.reemplazadoPorNumero) {
+          doc.fillColor('#B91C1C').font('Helvetica-Bold').fontSize(8).text(`Reemplazado por el certificado ${data.reemplazadoPorNumero}`, 40, 806, { width: 515, align: 'center', lineBreak: false });
+        }
+      }
 
       doc.end();
     });

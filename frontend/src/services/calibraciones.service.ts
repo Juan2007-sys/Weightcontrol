@@ -46,6 +46,9 @@ export interface BackendCalibracion {
   observaciones?: string;
   incertidumbreExpandida?: string;
   pdfUrl?: string;
+  anulado?: boolean;
+  motivoAnulacion?: string;
+  certificadoReemplazadoPor?: string;
   createdAt?: string;
 }
 
@@ -53,12 +56,23 @@ export const calibracionesService = {
   getAll: async (params?: { page?: number; limit?: number; search?: string }): Promise<{
     data: BackendCalibracion[];
     total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
   }> => {
     const res = await apiClient.get<any>('/calibraciones', params);
     if (Array.isArray(res)) {
-      return { data: res, total: res.length };
+      return { data: res, total: res.length, page: 1, limit: res.length || 1, totalPages: 1 };
     }
-    return { data: res?.data || [], total: res?.total || 0 };
+    const total = res?.meta?.total ?? res?.total ?? (res?.data?.length || 0);
+    const limit = res?.meta?.limit ?? params?.limit ?? 10;
+    return {
+      data: res?.data || [],
+      total,
+      page: res?.meta?.page ?? params?.page ?? 1,
+      limit,
+      totalPages: res?.meta?.totalPages ?? (Math.ceil(total / limit) || 1),
+    };
   },
 
   getByInstrumento: async (instrumentoId: string): Promise<BackendCalibracion[]> => {

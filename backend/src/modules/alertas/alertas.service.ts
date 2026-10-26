@@ -65,13 +65,23 @@ export class AlertasService {
       const proxInicio = new Date(fechaProx.getFullYear(), fechaProx.getMonth(), fechaProx.getDate());
 
       const diffTiempo = proxInicio.getTime() - hoyInicio.getTime();
-      const diasRestantes = Math.ceil(diffTiempo / (1000 * 60 * 60 * 24));
+      // Diferencia en DÍAS CALENDARIO (ambas fechas normalizadas a 00:00), no en horas:
+      // "vence en 5 días" significa que la fecha de vencimiento está 5 días de calendario
+      // adelante (umbrales C3: 30/15/5). El redondeo solo absorbe desfases de horario de verano.
+      let diasRestantes: number | null = Math.round(diffTiempo / (1000 * 60 * 60 * 24));
 
       let nivelCriticidad: NivelAlerta | null = null;
       let nuevoEstado: EstadoInstrumento = EstadoInstrumento.VIGENTE;
       let mensaje = '';
 
-      if (diasRestantes < 0) {
+      if ((inst as any).motivoVencimiento === 'NO_CONFORME') {
+        // C2: vencido por calibracion No Conforme; la fecha no lo restablece.
+        nivelCriticidad = NivelAlerta.VENCIDA;
+        nuevoEstado = EstadoInstrumento.VENCIDO;
+        // No aplica un conteo de días: se envía null (la fecha no gobierna este estado).
+        diasRestantes = null;
+        mensaje = `El instrumento con serial ${inst.serial} fue declarado NO CONFORME en su última calibración y permanece VENCIDO hasta una calibración conforme.`;
+      } else if (diasRestantes < 0) {
         nivelCriticidad = NivelAlerta.VENCIDA;
         nuevoEstado = EstadoInstrumento.VENCIDO;
         mensaje = `El instrumento con serial ${inst.serial} tiene la calibración VENCIDA desde hace ${Math.abs(diasRestantes)} día(s). Se requiere calibración inmediata.`;
@@ -277,6 +287,18 @@ export class AlertasService {
     };
   }
 
+  /**
+   * Una alerta VENCIDA por calibración No Conforme no tiene conteo de días. Las alertas creadas
+   * antes de la corrección guardaron el cálculo por fecha (p. ej. 341); aquí se normalizan al
+   * serializar, sin modificar los datos persistidos.
+   */
+  private diasRestantesVisibles(doc: AlertaDocument): number | null {
+    const esNoConforme =
+      doc.nivelCriticidad === NivelAlerta.VENCIDA && /NO CONFORME/.test(doc.mensaje ?? '');
+    if (esNoConforme) return null;
+    return doc.diasRestantes ?? null;
+  }
+
   private mapToResponse(doc: AlertaDocument): AlertaResponseDto {
     return {
       id: doc._id.toString(),
@@ -285,7 +307,7 @@ export class AlertasService {
       marca: doc.marca,
       modelo: doc.modelo,
       fechaProximaCalibracion: doc.fechaProximaCalibracion,
-      diasRestantes: doc.diasRestantes,
+      diasRestantes: this.diasRestantesVisibles(doc),
       nivelCriticidad: doc.nivelCriticidad,
       mensaje: doc.mensaje,
       canalesNotificados: doc.canalesNotificados || [],

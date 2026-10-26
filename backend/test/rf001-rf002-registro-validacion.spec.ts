@@ -22,7 +22,7 @@ describe('🔴 RF001 & RF002 — Registro y Validación Técnica Metrológica (N
     const basculaValidator = new BasculaValidator();
     const pesaValidator = new PesaValidator();
     const dinamometroValidator = new DinamometroValidator();
-    validationEngine = new ValidationEngineService(basculaValidator, pesaValidator, dinamometroValidator);
+    validationEngine = new ValidationEngineService([basculaValidator, pesaValidator, dinamometroValidator]);
 
     mockAuditService = {
       logEvent: vi.fn().mockResolvedValue({}),

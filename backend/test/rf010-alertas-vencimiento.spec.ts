@@ -30,11 +30,11 @@ describe('🟡 RF010 — Motor de Detección y Notificación de Alertas Metroló
       sendNotification: vi.fn().mockResolvedValue(true),
     };
 
-    notificadorEngine = new NotificadorEngineService(
+    notificadorEngine = new NotificadorEngineService([
       mockSistemaStrategy,
       mockEmailStrategy,
       mockAuditLogStrategy,
-    );
+    ]);
 
     mockAuditService = {
       logEvent: vi.fn().mockResolvedValue({}),

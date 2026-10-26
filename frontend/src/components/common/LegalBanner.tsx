@@ -28,7 +28,7 @@ export const LegalBanner: React.FC = () => {
           </div>
 
           <div>
-            <h3
+            <h2
               style={{
                 fontSize: '13px',
                 fontWeight: 800,
@@ -39,7 +39,7 @@ export const LegalBanner: React.FC = () => {
               }}
             >
               ADVERTENCIA LEGAL Y SANCIONATORIA · LEY 1480 DE 2011 (ESTATUTO DEL CONSUMIDOR)
-            </h3>
+            </h2>
 
             <p
               style={{

@@ -2,7 +2,7 @@ import React from 'react';
 
 export const GovBar: React.FC = () => {
   return (
-    <header 
+    <div 
       style={{
         backgroundColor: 'var(--gov-bar)',
         color: '#FFFFFF',
@@ -14,7 +14,7 @@ export const GovBar: React.FC = () => {
         fontSize: '11px',
         lineHeight: 1,
       }}
-      role="banner"
+      role="region"
       aria-label="Barra de Gobierno Nacional de la República de Colombia"
     >
       <div className="gov-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
@@ -55,7 +55,7 @@ export const GovBar: React.FC = () => {
           </span>
         </div>
       </div>
-    </header>
+    </div>
   );
 };
 

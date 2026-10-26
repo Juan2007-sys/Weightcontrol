@@ -1,0 +1,11 @@
+import {api,tok} from './lib.mjs'; import fs from 'fs';
+const t=tok(); const m=JSON.parse(fs.readFileSync('qausers.json'));
+const l=await api('POST','/auth/login',{body:{email:'qa-tecnico@example.com',password:'QaPass123456!'}});console.log('login qa-tecnico',l.status);
+const tk=l.body.accessToken;
+console.log('antes de inactivar GET /instrumentos con token QA',(await api('GET','/instrumentos?limit=5',{token:tk})).status);
+const s=await api('PATCH',`/usuarios/${m.TECNICO}/status`,{token:t.admin,body:{activo:false}});console.log('inactivar',s.status,JSON.stringify(s.body).slice(0,200));
+const r1=await api('GET','/instrumentos?limit=5',{token:tk});console.log('token previo GET /instrumentos',r1.status,JSON.stringify(r1.body));
+const r2=await api('GET','/auth/profile',{token:tk});console.log('token previo profile',r2.status);
+const r3=await api('POST','/calibraciones',{token:tk,body:{}});console.log('token previo POST calibraciones',r3.status);
+const r4=await api('POST','/auth/login',{body:{email:'qa-tecnico@example.com',password:'QaPass123456!'}});console.log('login inactivo',r4.status,JSON.stringify(r4.body));
+const s2=await api('PATCH',`/usuarios/${m.TECNICO}/status`,{token:t.admin,body:{activo:true}});console.log('reactivar',s2.status);

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { PdfGeneratorService } from '../src/modules/calibraciones/pdf-generator.service.js';
+import { PdfGeneratorService, textoDictamen } from '../src/modules/calibraciones/pdf-generator.service.js';
 
 describe('🏛️ PdfGeneratorService — Validación Oficial y Verificabilidad de Certificados PDF y QR (HU-04)', () => {
   const service = new PdfGeneratorService();
@@ -88,5 +88,23 @@ describe('🏛️ PdfGeneratorService — Validación Oficial y Verificabilidad 
     expect(pdfBuffer.length).toBeGreaterThan(15000);
     const pdfRaw = pdfBuffer.toString('utf-8');
     expect(pdfRaw).toContain('CERT-NTC2031-2026-9901');
+  });
+});
+
+describe('F6a - dictamen del PDF coherente con anulacion / No Conforme', () => {
+  it('anulado con resultado Conforme no dice "CONFORME (APTO"', () => {
+    const d = textoDictamen({ resultado: 'Conforme', anulado: true });
+    expect(d.texto).toMatch(/ANULADO/);
+    expect(d.texto).not.toMatch(/CONFORME \(APTO/);
+    expect(d.verde).toBe(false);
+  });
+  it('No Conforme muestra NO CONFORME', () => {
+    expect(textoDictamen({ resultado: 'No Conforme' }).texto).toMatch(/NO CONFORME/);
+    expect(textoDictamen({ resultado: 'No Conforme', anulado: true }).texto).toMatch(/NO CONFORME.*ANULADO/);
+  });
+  it('Conforme vigente conserva el dictamen conforme', () => {
+    const d = textoDictamen({ resultado: 'Conforme' });
+    expect(d.texto).toMatch(/CONFORME \(APTO/);
+    expect(d.verde).toBe(true);
   });
 });

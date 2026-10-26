@@ -54,6 +54,7 @@ describe('InstrumentosController', () => {
       update: vi.fn().mockResolvedValue(mockInstrumento),
       delete: vi.fn().mockResolvedValue({ message: 'Eliminado', id: '60d0fe4f5311236168a109aa' }),
       findById: vi.fn().mockResolvedValue(mockInstrumento),
+      verifyPublicById: vi.fn().mockResolvedValue(mockInstrumento),
       findBySerial: vi.fn().mockResolvedValue(mockInstrumento),
       verifyPublic: vi.fn().mockResolvedValue(mockInstrumento),
     };
@@ -85,7 +86,7 @@ describe('InstrumentosController', () => {
     };
     const req = { ip: '127.0.0.1', headers: { 'user-agent': 'Vitest' }, socket: {} } as any;
 
-    const result = await controller.create(createDto, 'user_123', req);
+    const result = await controller.create(createDto as any, 'user_123', req);
 
     expect(result).toEqual(mockInstrumento);
     expect(mockService.create).toHaveBeenCalledWith(createDto, 'user_123', '127.0.0.1', 'Vitest');
@@ -93,10 +94,17 @@ describe('InstrumentosController', () => {
 
   it('debe listar instrumentos con paginación y filtros', async () => {
     const query = { page: 1, limit: 10, search: 'Torrey' };
-    const result = await controller.findAll(query);
+    const result = await controller.findAll(query, { id: 'u1' });
 
     expect(result).toEqual(mockPaginated);
     expect(mockService.findAll).toHaveBeenCalledWith(query);
+  });
+
+  it('sin sesion lista en modo publico (sin datos sensibles)', async () => {
+    const query = { page: 1, limit: 10 };
+    await controller.findAll(query);
+
+    expect(mockService.findAll).toHaveBeenCalledWith(query, { publico: true });
   });
 
   it('debe retornar estadísticas metrológicas consolidadas', async () => {
@@ -107,13 +115,20 @@ describe('InstrumentosController', () => {
   });
 
   it('debe buscar públicamente por serial (publicSearch y findBySerial)', async () => {
-    const pub = await controller.publicSearch('BASC-001');
-    expect(pub).toEqual(mockInstrumento);
-    expect(mockService.verifyPublic).toHaveBeenCalledWith('BASC-001');
+    const req = { ip: '127.0.0.1', headers: { 'user-agent': 'Vitest' }, socket: {} } as any;
+    const ctxVacio = { cert: undefined, sig: undefined, ipAddress: '127.0.0.1', userAgent: 'Vitest' };
 
-    const bySerial = await controller.findBySerial('BASC-001');
+    const pub = await controller.publicSearch('BASC-001', req);
+    expect(pub).toEqual(mockInstrumento);
+    expect(mockService.verifyPublic).toHaveBeenCalledWith('BASC-001', ctxVacio);
+
+    const bySerial = await controller.findBySerial('BASC-001', req);
     expect(bySerial).toEqual(mockInstrumento);
-    expect(mockService.verifyPublic).toHaveBeenCalledWith('BASC-001');
+    expect(mockService.verifyPublic).toHaveBeenCalledWith('BASC-001', ctxVacio);
+
+    // El QR firmado propaga cert + sig al servicio
+    await controller.findBySerial('BASC-001', req, 'CERT-1', 'firma');
+    expect(mockService.verifyPublic).toHaveBeenLastCalledWith('BASC-001', { ...ctxVacio, cert: 'CERT-1', sig: 'firma' });
   });
 
   it('debe actualizar un instrumento', async () => {

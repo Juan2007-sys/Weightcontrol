@@ -27,6 +27,8 @@ import { InstrumentosService } from '../instrumentos/instrumentos.service.js';
 import { PdfGeneratorService } from './pdf-generator.service.js';
 import { CreateCalibracionDto } from './dto/create-calibracion.dto.js';
 import { UpdateCalibracionDto } from './dto/update-calibracion.dto.js';
+import { CorregirCalibracionDto } from './dto/corregir-calibracion.dto.js';
+import { buildSignedVerificationUrl } from './qr-signature.js';
 import { QueryCalibracionesDto } from './dto/query-calibraciones.dto.js';
 import { CalibracionResponseDto } from './dto/calibracion-response.dto.js';
 import { PaginatedResponseDto } from '../instrumentos/dto/paginated-response.dto.js';
@@ -93,8 +95,19 @@ export class CalibracionesService {
 
     const codigoFolio = `CERT-FOLIO-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 
+    const esNoConforme = createDto.resultado !== ResultadoCalibracion.CONFORME;
+
     const nuevaCalibracion = new this.calibracionModel({
       ...createDto,
+      // C2: un resultado No Conforme nace con el certificado anulado (no vigente).
+      ...(esNoConforme
+        ? {
+            anulado: true,
+            motivoAnulacion: 'Resultado No Conforme',
+            fechaAnulacion: new Date(),
+            anuladoPor: tecnicoId,
+          }
+        : {}),
       numeroCertificado: numCertificadoNormalizado,
       codigoFolio,
       bloqueadoInmutable: true, // Sello de inmutabilidad tras su emisión
@@ -134,9 +147,12 @@ export class CalibracionesService {
         instrumento.codigoPrecintoSIMEL = createDto.codigoPrecintoSIMEL;
       }
       instrumento.estado = this.instrumentosService.calcularEstado(fechaProx);
+      // Una calibracion Conforme posterior restablece el instrumento.
+      instrumento.motivoVencimiento = undefined;
     } else {
       // Si el resultado es No Conforme, el instrumento pasa a estado Vencido para bloquear operaciones
       instrumento.estado = EstadoInstrumento.VENCIDO;
+      instrumento.motivoVencimiento = 'NO_CONFORME';
     }
     instrumento.actualizadoPor = tecnicoId;
     await instrumento.save();
@@ -162,6 +178,95 @@ export class CalibracionesService {
     });
 
     return this.findById(guardada._id.toString());
+  }
+
+  /**
+   * Correccion formal (HU-04). El certificado sellado NUNCA se edita: se emite uno nuevo
+   * (que referencia al anterior en `reemplazaA`) y el original solo recibe los campos de
+   * estado de anulacion (`anulado`, `motivoAnulacion`, `certificadoReemplazadoPor`...).
+   * Todo queda auditado (CALIBRATE del nuevo + ANNUL del original).
+   */
+  async corregir(
+    id: string,
+    dto: CorregirCalibracionDto,
+    userId: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<CalibracionResponseDto> {
+    const motivo = (dto.motivo ?? '').trim();
+    if (motivo.length < 10) {
+      throw new BadRequestException('El motivo de anulación es obligatorio (mínimo 10 caracteres).');
+    }
+    if (!dto.nuevaCalibracion) {
+      throw new BadRequestException('Debe indicar los datos del certificado de reemplazo.');
+    }
+
+    const original = await this.calibracionModel.findById(id);
+    if (!original) {
+      throw new NotFoundException(`Calibración con ID '${id}' no encontrada.`);
+    }
+    if (original.anulado) {
+      throw new ConflictException(`El certificado '${original.numeroCertificado}' ya fue anulado.`);
+    }
+    if (dto.nuevaCalibracion.numeroCertificado?.trim() === original.numeroCertificado) {
+      throw new ConflictException('El certificado de reemplazo debe tener un número distinto al del certificado anulado.');
+    }
+
+    const instrumentoId = (original.instrumento as any)?._id?.toString?.() ?? original.instrumento.toString();
+
+    // 1. Emitir el nuevo certificado (valida completitud y unicidad antes de tocar el original).
+    const nuevo = await this.create(
+      { ...dto.nuevaCalibracion, instrumentoId },
+      userId,
+      ipAddress,
+      userAgent,
+    );
+
+    // 2. Marcar el original como anulado (solo campos de estado; el contenido sellado no cambia).
+    const fechaAnulacion = new Date();
+    await this.calibracionModel.updateOne(
+      { _id: original._id },
+      {
+        $set: {
+          anulado: true,
+          motivoAnulacion: motivo,
+          fechaAnulacion,
+          anuladoPor: userId,
+          certificadoReemplazadoPor: nuevo.id,
+        },
+      },
+    );
+    await this.calibracionModel.updateOne({ _id: nuevo.id }, { $set: { reemplazaA: original._id } });
+
+    if (this.certificadoModel) {
+      try {
+        await this.certificadoModel.updateOne(
+          { calibracion: original._id } as any,
+          { $set: { estado: EstadoCertificado.ANULADO, motivoAnulacion: motivo } },
+        );
+      } catch (err) {
+        this.logger.warn(`No se pudo anular el certificado espejo: ${err}`);
+      }
+    }
+
+    await this.auditService.logEvent({
+      userId,
+      actionType: TipoAccionAuditoria.ANNUL,
+      entityAffected: EntidadAfectada.CALIBRACION,
+      identifier: original.numeroCertificado,
+      previousState: { anulado: false, numeroCertificado: original.numeroCertificado },
+      newState: {
+        anulado: true,
+        motivoAnulacion: motivo,
+        reemplazadoPor: nuevo.numeroCertificado,
+        certificadoReemplazadoPor: nuevo.id,
+      },
+      ipAddress,
+      userAgent,
+      descripcion: `Anulación formal del certificado ${original.numeroCertificado}; reemplazado por ${nuevo.numeroCertificado}. Motivo: ${motivo}`,
+    });
+
+    return this.findById(nuevo.id);
   }
 
   async findAll(query: QueryCalibracionesDto): Promise<PaginatedResponseDto<CalibracionResponseDto>> {
@@ -201,9 +306,13 @@ export class CalibracionesService {
       ];
     }
 
-    const sortField = query.sortBy || 'fechaCalibracion';
+    // Por defecto: fecha de emisión (createdAt) descendente, así el certificado recién emitido
+    // aparece primero. `_id` desempata de forma estable para que la paginación no repita ni omita filas.
+    const SORTABLE = ['createdAt', 'fechaCalibracion', 'fechaProximaCalibracion', 'numeroCertificado'];
+    const sortField = query.sortBy && SORTABLE.includes(query.sortBy) ? query.sortBy : 'createdAt';
     const sortDirection = query.sortOrder?.toLowerCase() === 'asc' ? 1 : -1;
     const sortOption: Record<string, 1 | -1> = { [sortField]: sortDirection };
+    if (sortField !== '_id') sortOption._id = sortDirection;
 
     const [docs, total] = await Promise.all([
       this.calibracionModel
@@ -399,7 +508,12 @@ export class CalibracionesService {
     }
 
     const instrumento = calibracion.instrumento as any;
-    const tecnico = calibracion.tecnico as any;
+
+    let reemplazadoPorNumero: string | undefined;
+    if (calibracion.anulado && calibracion.certificadoReemplazadoPor) {
+      const rep: any = await this.calibracionModel.findById(calibracion.certificadoReemplazadoPor);
+      reemplazadoPorNumero = rep?.numeroCertificado;
+    }
 
     return await this.pdfGeneratorService.generateCertificadoPdf({
       numeroCertificado: calibracion.numeroCertificado,
@@ -407,7 +521,8 @@ export class CalibracionesService {
       fechaEmision: calibracion.fechaCalibracion,
       fechaVencimiento: calibracion.fechaProximaCalibracion,
       laboratorioAcreditado: calibracion.laboratorioAcreditado || 'Laboratorio Metrológico Autorizado',
-      tecnicoNombre: tecnico?.nombre || 'Técnico Metrólogo',
+      // Habeas Data: el PDF es de acceso publico (QR), por eso no se imprime el nombre del tecnico.
+      tecnicoNombre: 'Firma electrónica registrada',
       instrumento: {
         serial: instrumento?.serial || 'N/A',
         marca: instrumento?.marca || 'N/A',
@@ -433,7 +548,14 @@ export class CalibracionesService {
         errorMaximoPermitido: e.errorMaximoPermitido,
         cumple: e.cumple,
       })),
-      verificationUrl: `${(process.env.PUBLIC_APP_URL || 'http://localhost:5173').replace(/\/+$/, '')}/?cert=${encodeURIComponent(calibracion.numeroCertificado)}&serial=${encodeURIComponent(instrumento?.serial || '')}`,
+      // QR firmado con HMAC-SHA256 sobre cert+serial (HU-05).
+      verificationUrl: buildSignedVerificationUrl(
+        process.env.PUBLIC_APP_URL || 'http://localhost:5173',
+        calibracion.numeroCertificado,
+        instrumento?.serial || '',
+      ),
+      anulado: calibracion.anulado === true,
+      reemplazadoPorNumero,
     });
   }
 
@@ -453,6 +575,11 @@ export class CalibracionesService {
       incertidumbreExpandida: doc.incertidumbreExpandida,
       observaciones: doc.observaciones,
       archivoInformeUrl: doc.archivoInformeUrl,
+      anulado: doc.anulado === true,
+      motivoAnulacion: doc.motivoAnulacion,
+      fechaAnulacion: doc.fechaAnulacion,
+      certificadoReemplazadoPor: doc.certificadoReemplazadoPor?.toString(),
+      reemplazaA: doc.reemplazaA?.toString(),
       createdAt: (doc as any).createdAt,
       updatedAt: (doc as any).updatedAt,
     };

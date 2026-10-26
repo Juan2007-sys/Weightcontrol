@@ -20,7 +20,11 @@ import { useAuth } from '../../context/AuthContext';
 
 export const AdminSettingsView: React.FC = () => {
   const { user: currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'usuarios' | 'trazabilidad' | 'parametros'>('usuarios');
+  // AUDITOR y SIC: solo lectura de la trazabilidad (sin usuarios ni parámetros). El backend responde 403 en lo demás.
+  const isAdmin = currentUser?.rol === 'ADMIN';
+  const [activeTab, setActiveTab] = useState<'usuarios' | 'trazabilidad' | 'parametros'>(
+    currentUser?.rol === 'ADMIN' ? 'usuarios' : 'trazabilidad'
+  );
 
   // Estados de Usuarios
   const [users, setUsers] = useState<UserItem[]>([]);
@@ -64,6 +68,7 @@ export const AdminSettingsView: React.FC = () => {
   // Estados de Auditoría
   const [auditLogs, setAuditLogs] = useState<AuditEventItem[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
+  const [auditError, setAuditError] = useState<string | null>(null);
 
   // Parámetros Maestros
   const [thresholdDays, setThresholdDays] = useState('30');
@@ -94,21 +99,25 @@ export const AdminSettingsView: React.FC = () => {
   // Cargar registros de auditoría
   const fetchAuditLogs = useCallback(async () => {
     setLoadingAudit(true);
+    setAuditError(null);
     try {
       const res = await auditService.getAll({ limit: 50 });
-      if (res && res.items) {
-        setAuditLogs(res.items);
-      }
-    } catch {
-      // Fallback
+      setAuditLogs(Array.isArray(res?.items) ? res.items : []);
+    } catch (err: any) {
+      setAuditLogs([]);
+      setAuditError(
+        err?.status === 403
+          ? 'No tiene permisos para consultar la bitácora de auditoría (HTTP 403).'
+          : `No se pudo cargar la bitácora de auditoría${err?.message ? `: ${err.message}` : '.'}`
+      );
     } finally {
       setLoadingAudit(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    if (isAdmin) fetchUsers();
+  }, [fetchUsers, isAdmin]);
 
   useEffect(() => {
     if (activeTab === 'trazabilidad') {
@@ -270,7 +279,7 @@ export const AdminSettingsView: React.FC = () => {
           }}
         >
           <div className="microlabel" style={{ color: 'var(--text-muted)' }}>
-            CONSOLA DE MANDO CENTRALIZADA · CONTROL DE ACCESO RBAC Y SEGURIDAD
+            {isAdmin ? 'CONSOLA DE MANDO CENTRALIZADA · CONTROL DE ACCESO RBAC Y SEGURIDAD' : 'CONSULTA DE SOLO LECTURA · BITÁCORA INMUTABLE'}
           </div>
           <h1
             style={{
@@ -282,10 +291,12 @@ export const AdminSettingsView: React.FC = () => {
               letterSpacing: '-0.02em',
             }}
           >
-            Administración del Sistema, Usuarios y Seguridad
+            {isAdmin ? 'Administración del Sistema, Usuarios y Seguridad' : 'Trazabilidad y Auditoría'}
           </h1>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
-            Gestión completa del ciclo de vida de usuarios, diferenciación de privilegios RBAC, parámetros globales NTC 2031 y trazabilidad inmutable.
+            {isAdmin
+              ? 'Gestión completa del ciclo de vida de usuarios, diferenciación de privilegios RBAC, parámetros globales NTC 2031 y trazabilidad inmutable.'
+              : 'Consulta de solo lectura de la bitácora de trazabilidad y eventos de auditoría del sistema.'}
           </p>
         </div>
 
@@ -298,6 +309,7 @@ export const AdminSettingsView: React.FC = () => {
             marginBottom: '24px',
           }}
         >
+          {isAdmin && (
           <button
             type="button"
             onClick={() => setActiveTab('usuarios')}
@@ -319,6 +331,8 @@ export const AdminSettingsView: React.FC = () => {
             <UsersIcon size={16} />
             <span>1. Gestión de Usuarios y Roles (RBAC)</span>
           </button>
+
+          )}
 
           <button
             type="button"
@@ -342,6 +356,7 @@ export const AdminSettingsView: React.FC = () => {
             <span>2. Trazabilidad Forense y Eventos 403</span>
           </button>
 
+          {isAdmin && (
           <button
             type="button"
             onClick={() => setActiveTab('parametros')}
@@ -363,10 +378,11 @@ export const AdminSettingsView: React.FC = () => {
             <ShieldCheckIcon size={16} />
             <span>3. Parámetros Maestros y Criptografía</span>
           </button>
+          )}
         </div>
 
         {/* PESTAÑA 1: GESTIÓN DE USUARIOS */}
-        {activeTab === 'usuarios' && (
+        {isAdmin && activeTab === 'usuarios' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {/* Tarjetas KPI de Usuarios */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
@@ -434,6 +450,7 @@ export const AdminSettingsView: React.FC = () => {
                 </div>
 
                 <select
+                  aria-label="Filtrar usuarios por rol"
                   value={roleFilter}
                   onChange={(e) => setRoleFilter(e.target.value)}
                   style={{
@@ -452,6 +469,7 @@ export const AdminSettingsView: React.FC = () => {
                 </select>
 
                 <select
+                  aria-label="Filtrar usuarios por estado"
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
                   style={{
@@ -538,7 +556,7 @@ export const AdminSettingsView: React.FC = () => {
                             <td style={{ padding: '12px 16px' }}>
                               <div style={{ fontWeight: 700, color: 'var(--navy-900)' }}>{u.nombre}</div>
                               <div className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{u.email}</div>
-                              {u.entidad && <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>{u.entidad}</div>}
+                              {u.entidad && <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '2px' }}>{u.entidad}</div>}
                             </td>
 
                             <td style={{ padding: '12px 16px' }}>
@@ -677,6 +695,15 @@ export const AdminSettingsView: React.FC = () => {
                 </button>
               </div>
 
+              {auditError && (
+                <div
+                  role="alert"
+                  style={{ marginBottom: '12px', padding: '10px 14px', border: '1px solid var(--danger)', borderRadius: 'var(--radius-input)', backgroundColor: 'var(--danger-bg)', color: 'var(--danger)', fontSize: '13px', fontWeight: 600 }}
+                >
+                  {auditError}
+                </div>
+              )}
+
               <div style={{ overflowX: 'auto' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                   <thead>
@@ -693,7 +720,7 @@ export const AdminSettingsView: React.FC = () => {
                     {auditLogs.length === 0 ? (
                       <tr>
                         <td colSpan={6} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                          {loadingAudit ? 'Cargando eventos de auditoría...' : 'No hay eventos de auditoría registrados recientemente.'}
+                          {loadingAudit ? 'Cargando eventos de auditoría...' : auditError ? 'No fue posible obtener los eventos. Use "Actualizar Bitácora" para reintentar.' : 'No hay eventos de auditoría registrados recientemente.'}
                         </td>
                       </tr>
                     ) : (
@@ -716,7 +743,7 @@ export const AdminSettingsView: React.FC = () => {
                                   display: 'inline-block',
                                   padding: '2px 6px',
                                   borderRadius: '3px',
-                                  fontSize: '10px',
+                                  fontSize: '11px',
                                   fontWeight: 800,
                                   fontFamily: 'var(--font-mono)',
                                   backgroundColor: isAuthFail ? '#FEE2E2' : '#E2E8F0',
@@ -733,7 +760,7 @@ export const AdminSettingsView: React.FC = () => {
                             <td style={{ padding: '10px 14px', color: isAuthFail ? '#991B1B' : 'var(--text-primary)' }}>
                               {log.descripcion || 'Sin descripción'}
                             </td>
-                            <td className="font-mono" style={{ padding: '10px 14px', fontSize: '11px', color: '#64748B' }}>
+                            <td className="font-mono" style={{ padding: '10px 14px', fontSize: '11px', color: 'var(--text-muted)' }}>
                               {log.ipAddress || '127.0.0.1'}
                             </td>
                           </tr>
@@ -748,7 +775,7 @@ export const AdminSettingsView: React.FC = () => {
         )}
 
         {/* PESTAÑA 3: PARÁMETROS MAESTROS */}
-        {activeTab === 'parametros' && (
+        {isAdmin && activeTab === 'parametros' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
             <div className="gov-card" style={{ padding: '24px', backgroundColor: '#FFFFFF' }}>
               <div className="microlabel" style={{ color: 'var(--navy-900)', marginBottom: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
@@ -757,10 +784,10 @@ export const AdminSettingsView: React.FC = () => {
 
               <form onSubmit={handleSaveParams} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  <label htmlFor="adm-f1" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
                     UMBRAL DE ALERTA TEMPRANA POR VENCIMIENTO (DÍAS DE ANTICIPACIÓN)
                   </label>
-                  <input
+                  <input id="adm-f1"
                     type="number"
                     value={thresholdDays}
                     onChange={(e) => setThresholdDays(e.target.value)}
@@ -772,10 +799,10 @@ export const AdminSettingsView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  <label htmlFor="adm-f2" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
                     PERIODICIDAD DE VERIFICACIÓN PERIÓDICA OBLIGATORIA (MESES)
                   </label>
-                  <input
+                  <input id="adm-f2"
                     type="number"
                     value={periodicityMonths}
                     onChange={(e) => setPeriodicityMonths(e.target.value)}
@@ -787,10 +814,10 @@ export const AdminSettingsView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  <label htmlFor="adm-f3" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
                     CATEGORÍA DE EXACTITUD PRINCIPAL DE CONTROL
                   </label>
-                  <select
+                  <select id="adm-f3"
                     value={empToleranceClass}
                     onChange={(e) => setEmpToleranceClass(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-input)', border: '1px solid var(--border-strong)' }}
@@ -816,10 +843,10 @@ export const AdminSettingsView: React.FC = () => {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
-                  <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  <label htmlFor="adm-f4" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
                     SERVIDOR DE ESTAMPADO CRONOLÓGICO NIST UTC-5
                   </label>
-                  <input
+                  <input id="adm-f4"
                     type="text"
                     disabled
                     value={timeServer}
@@ -828,10 +855,10 @@ export const AdminSettingsView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                  <label htmlFor="adm-f5" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
                     MÓDULO DE SEGURIDAD EN HARDWARE (HSM MASTER)
                   </label>
-                  <input
+                  <input id="adm-f5"
                     type="text"
                     disabled
                     value={hsmKey}
@@ -891,10 +918,10 @@ export const AdminSettingsView: React.FC = () => {
 
               <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
-                  <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                  <label htmlFor="adm-f6" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                     NOMBRE COMPLETO *
                   </label>
-                  <input
+                  <input id="adm-f6"
                     type="text"
                     required
                     value={createForm.nombre}
@@ -906,10 +933,10 @@ export const AdminSettingsView: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f7" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       CORREO ELECTRÓNICO *
                     </label>
-                    <input
+                    <input id="adm-f7"
                       type="email"
                       required
                       value={createForm.email}
@@ -920,10 +947,10 @@ export const AdminSettingsView: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f8" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       ROL INSTITUCIONAL *
                     </label>
-                    <select
+                    <select id="adm-f8"
                       value={createForm.rol}
                       onChange={(e) => setCreateForm({ ...createForm, rol: e.target.value as any })}
                       style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-input)', border: '1px solid var(--border-strong)' }}
@@ -938,10 +965,10 @@ export const AdminSettingsView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                  <label htmlFor="adm-f9" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                     CONTRASEÑA INICIAL (MÍN. 8 CARACTERES) *
                   </label>
-                  <input
+                  <input id="adm-f9"
                     type="password"
                     required
                     minLength={8}
@@ -954,10 +981,10 @@ export const AdminSettingsView: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f10" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       DOCUMENTO DE IDENTIDAD
                     </label>
-                    <input
+                    <input id="adm-f10"
                       type="text"
                       value={createForm.documentoIdentidad}
                       onChange={(e) => setCreateForm({ ...createForm, documentoIdentidad: e.target.value })}
@@ -967,10 +994,10 @@ export const AdminSettingsView: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f11" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       REGISTRO SIMEL / TARJETA PROF.
                     </label>
-                    <input
+                    <input id="adm-f11"
                       type="text"
                       value={createForm.numeroRegistroSIMEL}
                       onChange={(e) => setCreateForm({ ...createForm, numeroRegistroSIMEL: e.target.value })}
@@ -982,10 +1009,10 @@ export const AdminSettingsView: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f12" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       ENTIDAD / LABORATORIO
                     </label>
-                    <input
+                    <input id="adm-f12"
                       type="text"
                       value={createForm.entidad}
                       onChange={(e) => setCreateForm({ ...createForm, entidad: e.target.value })}
@@ -995,10 +1022,10 @@ export const AdminSettingsView: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f13" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       TELÉFONO DE CONTACTO
                     </label>
-                    <input
+                    <input id="adm-f13"
                       type="text"
                       value={createForm.telefono}
                       onChange={(e) => setCreateForm({ ...createForm, telefono: e.target.value })}
@@ -1063,10 +1090,10 @@ export const AdminSettingsView: React.FC = () => {
 
               <form onSubmit={handleUpdateUser} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                 <div>
-                  <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                  <label htmlFor="adm-f14" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                     NOMBRE COMPLETO
                   </label>
-                  <input
+                  <input id="adm-f14"
                     type="text"
                     required
                     value={editForm.nombre}
@@ -1077,10 +1104,10 @@ export const AdminSettingsView: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f15" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       CORREO ELECTRÓNICO
                     </label>
-                    <input
+                    <input id="adm-f15"
                       type="email"
                       required
                       value={editForm.email}
@@ -1090,10 +1117,10 @@ export const AdminSettingsView: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f16" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       ROL INSTITUCIONAL
                     </label>
-                    <select
+                    <select id="adm-f16"
                       value={editForm.rol}
                       onChange={(e) => setEditForm({ ...editForm, rol: e.target.value as any })}
                       style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-input)', border: '1px solid var(--border-strong)' }}
@@ -1108,10 +1135,10 @@ export const AdminSettingsView: React.FC = () => {
                 </div>
 
                 <div>
-                  <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                  <label htmlFor="adm-f17" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                     CAMBIAR CONTRASEÑA (DEJAR EN BLANCO PARA MANTENER LA ACTUAL)
                   </label>
-                  <input
+                  <input id="adm-f17"
                     type="password"
                     value={editForm.password || ''}
                     onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
@@ -1122,10 +1149,10 @@ export const AdminSettingsView: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f18" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       DOCUMENTO DE IDENTIDAD
                     </label>
-                    <input
+                    <input id="adm-f18"
                       type="text"
                       value={editForm.documentoIdentidad}
                       onChange={(e) => setEditForm({ ...editForm, documentoIdentidad: e.target.value })}
@@ -1134,10 +1161,10 @@ export const AdminSettingsView: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f19" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       REGISTRO SIMEL
                     </label>
-                    <input
+                    <input id="adm-f19"
                       type="text"
                       value={editForm.numeroRegistroSIMEL}
                       onChange={(e) => setEditForm({ ...editForm, numeroRegistroSIMEL: e.target.value })}
@@ -1148,10 +1175,10 @@ export const AdminSettingsView: React.FC = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f20" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       ENTIDAD
                     </label>
-                    <input
+                    <input id="adm-f20"
                       type="text"
                       value={editForm.entidad}
                       onChange={(e) => setEditForm({ ...editForm, entidad: e.target.value })}
@@ -1160,10 +1187,10 @@ export const AdminSettingsView: React.FC = () => {
                   </div>
 
                   <div>
-                    <label className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
+                    <label htmlFor="adm-f21" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '4px' }}>
                       TELÉFONO
                     </label>
-                    <input
+                    <input id="adm-f21"
                       type="text"
                       value={editForm.telefono}
                       onChange={(e) => setEditForm({ ...editForm, telefono: e.target.value })}

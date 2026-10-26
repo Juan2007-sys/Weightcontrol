@@ -17,6 +17,7 @@ import {
 import type { Request, Response } from 'express';
 import { CalibracionesService } from './calibraciones.service.js';
 import { CreateCalibracionDto } from './dto/create-calibracion.dto.js';
+import { CorregirCalibracionDto } from './dto/corregir-calibracion.dto.js';
 import { UpdateCalibracionDto } from './dto/update-calibracion.dto.js';
 import { QueryCalibracionesDto } from './dto/query-calibraciones.dto.js';
 import { CalibracionResponseDto } from './dto/calibracion-response.dto.js';
@@ -46,8 +47,8 @@ export class CalibracionesController {
     return this.calibracionesService.create(createDto, userId, ipAddress, userAgent);
   }
 
+  // HU-05 / Habeas Data: el listado y el historial exponen tecnico/laboratorio, por eso exigen sesion.
   @Get()
-  @Public()
   async findAll(
     @Query() query: QueryCalibracionesDto,
   ): Promise<PaginatedResponseDto<CalibracionResponseDto>> {
@@ -55,11 +56,24 @@ export class CalibracionesController {
   }
 
   @Get('instrumento/:instrumentoId')
-  @Public()
   async findByInstrumento(
     @Param('instrumentoId') instrumentoId: string,
   ): Promise<CalibracionResponseDto[]> {
     return this.calibracionesService.findByInstrumento(instrumentoId);
+  }
+
+  @Post(':id/corregir')
+  @Roles(RolUsuario.ADMIN, RolUsuario.TECNICO)
+  @HttpCode(HttpStatus.CREATED)
+  async corregir(
+    @Param('id') id: string,
+    @Body() dto: CorregirCalibracionDto,
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ): Promise<CalibracionResponseDto> {
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+    return this.calibracionesService.corregir(id, dto, userId, ipAddress, userAgent);
   }
 
   @Get(':id/pdf')

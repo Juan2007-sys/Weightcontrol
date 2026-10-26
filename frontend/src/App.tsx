@@ -282,7 +282,11 @@ export const App: React.FC = () => {
               <>
                 <Breadcrumbs
                   moduleName="CONSOLA DE MANDO CENTRALIZADA"
-                  subSection="ADMINISTRACIÓN DEL SISTEMA, USUARIOS Y RBAC"
+                  subSection={
+                    user && user.rol !== 'ADMIN'
+                      ? 'TRAZABILIDAD Y AUDITORÍA'
+                      : 'ADMINISTRACIÓN DEL SISTEMA, USUARIOS Y RBAC'
+                  }
                   oecCode="ONAC-18-LAB-042"
                   scopeExpiration="31/DIC/2026"
                   privilegeLevel={privilegeLevelText}

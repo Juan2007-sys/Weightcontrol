@@ -17,17 +17,23 @@
   --border:         #E2E7EF;   /* Borde técnico estricto 1px */
   --border-strong:  #CBD5E1;   /* Borde enfatizado */
   --text-primary:   #0F1B2D;   /* Texto principal de alto contraste */
-  --text-muted:     #5A6A80;   /* Etiquetas secundarias y aclaraciones */
+  --text-muted:     #4F5F75;   /* Etiquetas secundarias (>=5.5:1 sobre todos los fondos claros, WCAG AA) */
 
   /* Estados Semánticos Metrológicos */
-  --ok:             #0E9F6E;   /* Apto / Vigente / Conforme */
+  --ok:             #047857;   /* Apto / Vigente / Conforme (5.48:1 sobre blanco, WCAG AA) */
   --ok-bg:          #E7F7F0;
-  --warn:           #D97706;   /* Por vencer / En observación / Alerta EMP */
+  --warn:           #B45309;   /* Por vencer / En observación / Alerta EMP (5.02:1 sobre blanco) */
   --warn-bg:        #FEF3C7;
-  --danger:         #DC2626;   /* No apto / Vencido / Precinto roto / Medida cautelar */
+  --danger:         #B91C1C;   /* No apto / Vencido / Precinto roto / Medida cautelar (6.47:1 sobre blanco) */
   --danger-bg:      #FEE2E2;
   --info:           #2563EB;   /* Auditoría en curso / Trámite */
+  --info-strong:    #0369A1;   /* Texto informativo/acento sobre claro (5.9:1 sobre blanco, >=5:1 sobre #F1F5F9) */
   --info-bg:        #E8F0FE;
+
+  /* Variantes para texto sobre fondos oscuros (gov-bar / navy): los tokens base son para fondos claros */
+  --ok-on-dark:     #34D399;
+  --warn-on-dark:   #FBBF24;
+  --danger-on-dark: #F87171;
 
   /* Tipografía */
   --font-heading:   'Barlow', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -89,7 +95,7 @@ input, select, textarea {
 
 /* Microtipografía Institucional (Firma Visual del Sistema) */
 .microlabel {
-  font-size: 11px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.09em;
   font-weight: 600;
@@ -97,7 +103,7 @@ input, select, textarea {
 }
 
 .microlabel-sm {
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.09em;
   font-weight: 600;
@@ -292,3 +298,19 @@ input, select, textarea {
   animation: nist-pulse 2s infinite ease-in-out;
 }
 
+
+/* Toasts (sonner richColors): colores de texto con contraste >= 4.5:1 sobre su fondo (WCAG AA) */
+:root [data-sonner-toaster][data-sonner-theme='light'] {
+  --success-bg: #E7F7F0;
+  --success-border: #A7E3C9;
+  --success-text: #065F46;
+  --error-bg: #FEE2E2;
+  --error-border: #FCA5A5;
+  --error-text: #991B1B;
+  --warning-bg: #FEF3C7;
+  --warning-border: #FCD34D;
+  --warning-text: #78350F;
+  --info-bg: #E8F0FE;
+  --info-border: #93B4F5;
+  --info-text: #1E3A8A;
+}

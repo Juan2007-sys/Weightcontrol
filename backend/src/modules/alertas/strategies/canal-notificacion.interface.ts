@@ -7,7 +7,7 @@ export interface NotificationPayload {
   marca: string;
   modelo: string;
   fechaProximaCalibracion: Date;
-  diasRestantes: number;
+  diasRestantes: number | null;
   nivelCriticidad: NivelAlerta;
   mensaje: string;
   destinatarioEmail?: string;

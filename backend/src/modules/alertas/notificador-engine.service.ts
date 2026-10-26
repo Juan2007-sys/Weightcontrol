@@ -1,24 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import {
   CanalNotificacionStrategy,
   NotificationPayload,
 } from './strategies/canal-notificacion.interface.js';
-import { SistemaNotificadorStrategy } from './strategies/sistema-notificador.strategy.js';
-import { EmailNotificadorStrategy } from './strategies/email-notificador.strategy.js';
-import { AuditLogNotificadorStrategy } from './strategies/audit-log-notificador.strategy.js';
+
+/**
+ * Token de inyeccion (M2) con los canales de notificacion. El modulo lo construye
+ * desde `CANALES_NOTIFICACION` (alertas.module.ts): un canal nuevo = su clase + una linea.
+ */
+export const CANALES_NOTIFICACION_TOKEN = 'CANALES_NOTIFICACION';
 
 @Injectable()
 export class NotificadorEngineService {
   private readonly logger = new Logger(NotificadorEngineService.name);
-  private readonly strategies: CanalNotificacionStrategy[];
 
   constructor(
-    sistemaStrategy: SistemaNotificadorStrategy,
-    emailStrategy: EmailNotificadorStrategy,
-    auditLogStrategy: AuditLogNotificadorStrategy,
-  ) {
-    this.strategies = [sistemaStrategy, emailStrategy, auditLogStrategy];
-  }
+    @Inject(CANALES_NOTIFICACION_TOKEN)
+    private readonly strategies: CanalNotificacionStrategy[],
+  ) {}
 
   async dispatch(payload: NotificationPayload): Promise<string[]> {
     const executedChannels: string[] = [];

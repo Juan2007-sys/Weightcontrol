@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Html5QrcodeScanner, Html5QrcodeScanType } from 'html5-qrcode';
 import { ShieldCheckIcon, AlertTriangleIcon } from '../common/Icons';
+import { useDialogA11y } from '../../utils/useDialogA11y';
 
 interface QrScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onScanSuccess: (decodedText: string) => void;
+  /** `qr` trae cert y sig cuando el QR es una URL firmada (HU-05). */
+  onScanSuccess: (decodedText: string, qr?: { cert?: string; sig?: string }) => void;
 }
 
 export const QrScannerModal: React.FC<QrScannerModalProps> = ({
@@ -39,10 +41,15 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
           (decodedText: string) => {
             // Extraer serial o certificado de URL si el QR contiene https://.../verificar?serial=... o ?cert=...
             let serial = decodedText.trim();
+            let qr: { cert?: string; sig?: string } | undefined;
             try {
               if (serial.startsWith('http://') || serial.startsWith('https://')) {
                 const url = new URL(serial);
                 const paramValue = url.searchParams.get('serial') || url.searchParams.get('cert');
+                const certParam = url.searchParams.get('cert');
+                if (certParam && url.searchParams.get('serial')) {
+                  qr = { cert: certParam, sig: url.searchParams.get('sig') || '' };
+                }
                 if (paramValue) {
                   serial = paramValue;
                 } else {
@@ -60,7 +67,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
             }
 
             scanner.clear().catch(() => {});
-            onScanSuccess(serial);
+            onScanSuccess(serial, qr);
             onClose();
           },
           (errorMessage: string) => {
@@ -88,10 +95,17 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
     };
   }, [isOpen, onScanSuccess, onClose]);
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(isOpen, onClose);
+
   if (!isOpen) return null;
 
   return (
     <div
+      ref={dialogRef}
+      tabIndex={-1}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Escanear código QR"
       style={{
         position: 'fixed',
         inset: 0,
@@ -142,6 +156,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
           </div>
           <button
             type="button"
+            aria-label="Cerrar escáner"
             onClick={onClose}
             style={{
               background: 'none',
@@ -183,7 +198,7 @@ export const QrScannerModal: React.FC<QrScannerModalProps> = ({
           )}
         </div>
 
-        <p style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px' }}>
+        <p style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', marginTop: '12px' }}>
           Enfoca el código QR impreso en el precinto holográfico o en el certificado del instrumento para verificarlo al instante.
         </p>
 

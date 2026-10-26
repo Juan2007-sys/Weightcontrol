@@ -17,6 +17,14 @@ interface RegisterInstrumentViewProps {
   onConsultSerialImmediately?: (serial: string) => void;
 }
 
+/** Gramos por unidad de medida declarada; unica fuente para el chequeo NTC 2031 y el payload. */
+const GRAMOS_POR_UNIDAD: Record<'kg' | 'g' | 'lb' | 't', number> = {
+  g: 1,
+  kg: 1000,
+  t: 1000000,
+  lb: 453.592,
+};
+
 export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
   onBackToAudit,
   onRegisteredSuccess,
@@ -32,6 +40,8 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
   const [duplicatePrecintoError, setDuplicatePrecintoError] = useState<string | null>(null);
   const [compressingField, setCompressingField] = useState<string | null>(null);
   const [successModalData, setSuccessModalData] = useState<RegistrationSuccessData | null>(null);
+  // Errores devueltos por el servidor, indexados por campo del backend (HU-02: {campo, mensaje}).
+  const [serverFieldErrors, setServerFieldErrors] = useState<Record<string, string>>({});
 
   const handleFileUpload = async (
     e: React.ChangeEvent<HTMLInputElement>,
@@ -180,8 +190,61 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
     checkSerialInDatabase(formData.serial);
   }, []);
 
+  // Campo del backend -> id del input en el formulario.
+  const FIELD_INPUT_ID: Record<string, string> = {
+    serial: 'reg-serial',
+    marca: 'reg-brand',
+    modelo: 'reg-model',
+    capacidadMaxima: 'reg-max',
+    capacidadMinima: 'reg-min',
+    unidadMedida: 'reg-unit',
+    divisionEscala: 'reg-e',
+    fotoEquipo: 'reg-foto-eq',
+    fotoPrecinto: 'reg-foto-prec',
+    fotoUbicacion: 'reg-foto-ub',
+    codigoPrecintoSIMEL: 'reg-stamp',
+    fechaProximaCalibracion: 'reg-date2',
+  };
+  // Campo del formulario -> campo del backend (solo donde difieren).
+  const FORM_TO_BACKEND_FIELD: Record<string, string> = {
+    capacidadMax: 'capacidadMaxima',
+    capacidadMin: 'capacidadMinima',
+    precintoSIMEL: 'codigoPrecintoSIMEL',
+  };
+
+  /** Atributos de accesibilidad de un campo: aria-invalid (local o de servidor) y aria-describedby al error. */
+  const fieldA11y = (campo: string, localInvalid = false, localDescId?: string) => {
+    const hasServerError = Boolean(serverFieldErrors[campo]);
+    // aria-describedby referencia el mensaje de error de servidor y/o el mensaje local visible del campo.
+    const ids = [
+      hasServerError ? `${FIELD_INPUT_ID[campo]}-err` : null,
+      localInvalid && localDescId ? localDescId : null,
+    ].filter(Boolean) as string[];
+    return {
+      'aria-invalid': localInvalid || hasServerError ? (true as const) : undefined,
+      'aria-describedby': ids.length ? ids.join(' ') : undefined,
+    };
+  };
+
+  const renderFieldError = (campo: string) =>
+    serverFieldErrors[campo] ? (
+      <div
+        id={`${FIELD_INPUT_ID[campo]}-err`}
+        role="alert"
+        style={{ marginTop: '4px', color: 'var(--danger)', fontSize: '12px', fontWeight: 600 }}
+      >
+        {serverFieldErrors[campo]}
+      </div>
+    ) : null;
+
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    const backendField = FORM_TO_BACKEND_FIELD[field] ?? field;
+    setServerFieldErrors((prev) => {
+      if (!prev[backendField]) return prev;
+      const { [backendField]: _removed, ...rest } = prev;
+      return rest;
+    });
     if (field === 'serial') {
       const err = validateSerialLocally(value);
       setDuplicateSerialError(err);
@@ -213,14 +276,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
     : null;
 
   // Conversión a gramos para el cálculo de escalones n = Max / e
-  const maxInGrams =
-    formData.unidadMedida === 'kg'
-      ? maxVal * 1000
-      : formData.unidadMedida === 't'
-      ? maxVal * 1000000
-      : formData.unidadMedida === 'lb'
-      ? maxVal * 453.592
-      : maxVal; // si es 'g'
+  const maxInGrams = maxVal * GRAMOS_POR_UNIDAD[formData.unidadMedida];
 
   const nDivisions = Math.round(maxInGrams / eGram);
 
@@ -497,6 +553,10 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
             {/* Fase 1 */}
             <div
               onClick={() => handleStepTransition(1)}
+              role="button"
+              tabIndex={0}
+              aria-current={currentStep === 1 ? 'step' : undefined}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleStepTransition(1); } }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -526,7 +586,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                 {currentStep > 1 ? <CheckIcon size={14} /> : '1'}
               </div>
               <div>
-                <div className="microlabel-sm" style={{ opacity: 0.75 }}>FASE 01</div>
+                <div className="microlabel-sm">FASE 01</div>
                 <div style={{ fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
                   Chasis y Metrología
                 </div>
@@ -536,6 +596,10 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
             {/* Fase 2 */}
             <div
               onClick={() => handleStepTransition(2)}
+              role="button"
+              tabIndex={0}
+              aria-current={currentStep === 2 ? 'step' : undefined}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleStepTransition(2); } }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -565,7 +629,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                 {currentStep > 2 ? <CheckIcon size={14} /> : '2'}
               </div>
               <div>
-                <div className="microlabel-sm" style={{ opacity: 0.75 }}>FASE 02</div>
+                <div className="microlabel-sm">FASE 02</div>
                 <div style={{ fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
                   Establecimiento y Sujeto
                 </div>
@@ -575,6 +639,10 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
             {/* Fase 3 */}
             <div
               onClick={() => handleStepTransition(3)}
+              role="button"
+              tabIndex={0}
+              aria-current={currentStep === 3 ? 'step' : undefined}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleStepTransition(3); } }}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -604,7 +672,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                 3
               </div>
               <div>
-                <div className="microlabel-sm" style={{ opacity: 0.75 }}>FASE 03</div>
+                <div className="microlabel-sm">FASE 03</div>
                 <div style={{ fontSize: '12px', fontWeight: 700, whiteSpace: 'nowrap' }}>
                   Precinto SIC y Certificado
                 </div>
@@ -614,7 +682,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
 
           {/* Barra de Progreso */}
           <div style={{ marginTop: '16px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '6px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '6px' }}>
               <span className="microlabel" style={{ color: 'var(--text-muted)' }}>PROGRESO DEL DILIGENCIAMIENTO</span>
               <strong className="font-mono" style={{ color: 'var(--navy-900)' }}>{progressPercentage}% COMPLETADO</strong>
             </div>
@@ -665,7 +733,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                             background: '#FEE2E2',
                             border: '1px solid #F87171',
                             color: '#991B1B',
-                            fontSize: '11px',
+                            fontSize: '12px',
                             fontWeight: 600,
                             cursor: 'pointer',
                             padding: '2px 8px',
@@ -687,7 +755,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                             background: '#EFF6FF',
                             border: '1px solid #93C5FD',
                             color: '#1D4ED8',
-                            fontSize: '11px',
+                            fontSize: '12px',
                             fontWeight: 600,
                             cursor: 'pointer',
                             padding: '2px 8px',
@@ -701,6 +769,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     </div>
                     <input
                       id="reg-serial"
+                        {...fieldA11y('serial', Boolean(duplicateSerialError), 'reg-serial-dup')}
                       type="text"
                       className="font-mono"
                       value={formData.serial}
@@ -717,8 +786,11 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                         color: duplicateSerialError ? 'var(--danger)' : 'inherit',
                       }}
                     />
+                      {renderFieldError('serial')}
                     {duplicateSerialError && (
                       <div
+                        id="reg-serial-dup"
+                        role="alert"
                         style={{
                           marginTop: '6px',
                           padding: '10px 12px',
@@ -750,7 +822,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                             border: 'none',
                             borderRadius: '4px',
                             padding: '4px 8px',
-                            fontSize: '11px',
+                            fontSize: '12px',
                             fontWeight: 600,
                             cursor: 'pointer',
                             whiteSpace: 'nowrap',
@@ -811,11 +883,12 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label htmlFor="reg-brand" className="microlabel" style={{ display: 'block', color: !isMarcaValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
+                      <label id="reg-brand-label" htmlFor="reg-brand" className="microlabel" style={{ display: 'block', color: !isMarcaValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
                         MARCA {!isMarcaValid && '(CAMPO OBLIGATORIO)'}
                       </label>
                       <input
                         id="reg-brand"
+                        {...fieldA11y('marca', !isMarcaValid, 'reg-brand-label')}
                         type="text"
                         value={formData.marca}
                         onChange={(e) => handleChange('marca', e.target.value)}
@@ -829,13 +902,15 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           fontWeight: 600,
                         }}
                       />
+                      {renderFieldError('marca')}
                     </div>
                     <div>
-                      <label htmlFor="reg-model" className="microlabel" style={{ display: 'block', color: !isModeloValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
+                      <label id="reg-model-label" htmlFor="reg-model" className="microlabel" style={{ display: 'block', color: !isModeloValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
                         MODELO {!isModeloValid && '(CAMPO OBLIGATORIO)'}
                       </label>
                       <input
                         id="reg-model"
+                        {...fieldA11y('modelo', !isModeloValid, 'reg-model-label')}
                         type="text"
                         value={formData.modelo}
                         onChange={(e) => handleChange('modelo', e.target.value)}
@@ -849,6 +924,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           fontWeight: 600,
                         }}
                       />
+                      {renderFieldError('modelo')}
                     </div>
                   </div>
 
@@ -859,6 +935,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                       </label>
                       <input
                         id="reg-max"
+                        {...fieldA11y('capacidadMaxima', !isCapacidadMaxValid, 'reg-capacity-err')}
                         type="number"
                         className="font-mono"
                         value={formData.capacidadMax}
@@ -872,6 +949,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           fontWeight: 700,
                         }}
                       />
+                      {renderFieldError('capacidadMaxima')}
                     </div>
                     <div>
                       <label htmlFor="reg-min" className="microlabel" style={{ display: 'block', color: !isCapacidadMinValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
@@ -879,6 +957,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                       </label>
                       <input
                         id="reg-min"
+                        {...fieldA11y('capacidadMinima', !isCapacidadMinValid, 'reg-capacity-err')}
                         type="number"
                         step="0.01"
                         className="font-mono"
@@ -893,13 +972,15 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           fontWeight: 700,
                         }}
                       />
+                      {renderFieldError('capacidadMinima')}
                     </div>
                     <div>
-                      <label htmlFor="reg-unit" className="microlabel" style={{ display: 'block', color: !isUnidadValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
+                      <label id="reg-unit-label" htmlFor="reg-unit" className="microlabel" style={{ display: 'block', color: !isUnidadValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
                         UNIDAD DE MEDIDA
                       </label>
                       <select
                         id="reg-unit"
+                        {...fieldA11y('unidadMedida', !isUnidadValid, 'reg-unit-label')}
                         value={formData.unidadMedida}
                         onChange={(e) => handleChange('unidadMedida', e.target.value)}
                         style={{
@@ -923,6 +1004,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                       </label>
                       <input
                         id="reg-e"
+                        {...fieldA11y('divisionEscala', !isDivisionEscalaValid, 'reg-ntc-msg')}
                         type="number"
                         className="font-mono"
                         value={formData.divisionEscala}
@@ -936,6 +1018,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           fontWeight: 700,
                         }}
                       />
+                      {renderFieldError('divisionEscala')}
                     </div>
                   </div>
 
@@ -950,6 +1033,8 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                   {/* Alerta Roja Visual de Inconsistencia de Capacidades (HU-02) */}
                   {!isCapacityConsistent && (
                     <div
+                      id="reg-capacity-err"
+                      role="alert"
                       style={{
                         padding: '12px 14px',
                         backgroundColor: 'var(--danger-bg)',
@@ -970,6 +1055,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
 
                   {/* Motor de Validación Metrológica NTC 2031 */}
                   <div
+                    id="reg-ntc-msg"
                     style={{
                       padding: '12px 16px',
                       borderRadius: 'var(--radius-card)',
@@ -990,7 +1076,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     <div style={{ marginTop: '4px', fontWeight: 600 }}>
                       {ntcValidation.message}
                     </div>
-                    <div style={{ fontSize: '11px', marginTop: '2px', opacity: 0.85 }}>
+                    <div style={{ fontSize: '12px', marginTop: '2px', opacity: 0.85 }}>
                       Escalones de verificación calculados: n = Max / e = ({maxInGrams.toLocaleString()} g / {eGram} g) = <strong>{nDivisions.toLocaleString()} escalones</strong>.
                     </div>
                   </div>
@@ -998,18 +1084,18 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                   {/* Evidencias Fotográficas Obligatorias con Preview Visual y Compresión Automática (HU-01) */}
                   <div style={{ marginTop: '8px' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                      <label className="microlabel" style={{ color: 'var(--navy-900)' }}>
+                      <h2 id="reg-evidencias-title" className="microlabel" style={{ color: 'var(--navy-900)', margin: 0 }}>
                         EVIDENCIAS FOTOGRÁFICAS OBLIGATORIAS (MÉTODO FORENSE NTC 2031)
-                      </label>
+                      </h2>
                       <span className="microlabel-sm" style={{ color: 'var(--blue-600)', backgroundColor: 'var(--blue-50)', padding: '2px 6px', borderRadius: '3px' }}>
                         ⚡ Auto-compresión a ~250KB activada
                       </span>
                     </div>
 
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                    <div role="group" aria-labelledby="reg-evidencias-title" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                       {/* Foto 1: Equipo */}
                       <div style={{ border: !isFotoEquipoValid ? '2px dashed var(--danger)' : '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: '10px', backgroundColor: !isFotoEquipoValid ? '#FEF2F2' : '#F8FAFC' }}>
-                        <label htmlFor="reg-foto-eq" style={{ fontSize: '11px', fontWeight: 700, color: !isFotoEquipoValid ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
+                        <label id="reg-foto-eq-label" htmlFor="reg-foto-eq" style={{ fontSize: '12px', fontWeight: 700, color: !isFotoEquipoValid ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
                           1. Foto Instrumento Completo {!isFotoEquipoValid && '(OBLIGATORIA)'}
                         </label>
                         <div style={{ marginBottom: '6px' }}>
@@ -1020,31 +1106,33 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                               backgroundColor: compressingField === 'fotoEquipo' ? '#FEF3C7' : '#EFF6FF',
                               border: '1px dashed var(--blue-600)',
                               borderRadius: '4px',
-                              fontSize: '11px',
+                              fontSize: '12px',
                               color: 'var(--blue-600)',
                               textAlign: 'center',
                               cursor: 'pointer',
                               fontWeight: 600,
                             }}
                           >
-                            {compressingField === 'fotoEquipo' ? '⏳ Comprimiendo...' : '📁 Subir / Tomar Foto'}
+                            {compressingField === 'fotoEquipo' ? '⏳ Comprimiendo...' : '📁 Subir foto del equipo'}
                             <input
                               type="file"
                               accept="image/*"
                               capture="environment"
                               onChange={(e) => handleFileUpload(e, 'fotoEquipo')}
-                              style={{ display: 'none' }}
+                              className="sr-only"
                             />
                           </label>
                         </div>
                         <input
                           id="reg-foto-eq"
+                        {...fieldA11y('fotoEquipo', !isFotoEquipoValid, 'reg-foto-eq-label')}
                           type="text"
                           value={formData.fotoEquipo.startsWith('data:') ? '[Foto Comprimida en Base64]' : formData.fotoEquipo}
                           onChange={(e) => handleChange('fotoEquipo', e.target.value)}
                           placeholder="O ingrese URL directa"
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '10px', borderRadius: 'var(--radius-input)', border: !isFotoEquipoValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: 'var(--radius-input)', border: !isFotoEquipoValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
                         />
+                      {renderFieldError('fotoEquipo')}
                         <div style={{ height: '80px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {formData.fotoEquipo ? (
                             <img
@@ -1054,14 +1142,14 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                               onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://placehold.co/200x100?text=Foto+Equipo'; }}
                             />
                           ) : (
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Sin imagen</span>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Sin imagen</span>
                           )}
                         </div>
                       </div>
 
                       {/* Foto 2: Precinto */}
                       <div style={{ border: !isFotoPrecintoValid ? '2px dashed var(--danger)' : '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: '10px', backgroundColor: !isFotoPrecintoValid ? '#FEF2F2' : '#F8FAFC' }}>
-                        <label htmlFor="reg-foto-prec" style={{ fontSize: '11px', fontWeight: 700, color: !isFotoPrecintoValid ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
+                        <label id="reg-foto-prec-label" htmlFor="reg-foto-prec" style={{ fontSize: '12px', fontWeight: 700, color: !isFotoPrecintoValid ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
                           2. Foto Precinto SIMEL {!isFotoPrecintoValid && '(OBLIGATORIA)'}
                         </label>
                         <div style={{ marginBottom: '6px' }}>
@@ -1072,31 +1160,33 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                               backgroundColor: compressingField === 'fotoPrecinto' ? '#FEF3C7' : '#EFF6FF',
                               border: '1px dashed var(--blue-600)',
                               borderRadius: '4px',
-                              fontSize: '11px',
+                              fontSize: '12px',
                               color: 'var(--blue-600)',
                               textAlign: 'center',
                               cursor: 'pointer',
                               fontWeight: 600,
                             }}
                           >
-                            {compressingField === 'fotoPrecinto' ? '⏳ Comprimiendo...' : '📁 Subir / Tomar Foto'}
+                            {compressingField === 'fotoPrecinto' ? '⏳ Comprimiendo...' : '📁 Subir foto del precinto'}
                             <input
                               type="file"
                               accept="image/*"
                               capture="environment"
                               onChange={(e) => handleFileUpload(e, 'fotoPrecinto')}
-                              style={{ display: 'none' }}
+                              className="sr-only"
                             />
                           </label>
                         </div>
                         <input
                           id="reg-foto-prec"
+                        {...fieldA11y('fotoPrecinto', !isFotoPrecintoValid, 'reg-foto-prec-label')}
                           type="text"
                           value={formData.fotoPrecinto.startsWith('data:') ? '[Foto Comprimida en Base64]' : formData.fotoPrecinto}
                           onChange={(e) => handleChange('fotoPrecinto', e.target.value)}
                           placeholder="O ingrese URL directa"
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '10px', borderRadius: 'var(--radius-input)', border: !isFotoPrecintoValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: 'var(--radius-input)', border: !isFotoPrecintoValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
                         />
+                      {renderFieldError('fotoPrecinto')}
                         <div style={{ height: '80px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {formData.fotoPrecinto ? (
                             <img
@@ -1106,14 +1196,14 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                               onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://placehold.co/200x100?text=Foto+Precinto'; }}
                             />
                           ) : (
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Sin imagen</span>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Sin imagen</span>
                           )}
                         </div>
                       </div>
 
                       {/* Foto 3: Ubicación */}
                       <div style={{ border: !isFotoUbicacionValid ? '2px dashed var(--danger)' : '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: '10px', backgroundColor: !isFotoUbicacionValid ? '#FEF2F2' : '#F8FAFC' }}>
-                        <label htmlFor="reg-foto-ub" style={{ fontSize: '11px', fontWeight: 700, color: !isFotoUbicacionValid ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
+                        <label id="reg-foto-ub-label" htmlFor="reg-foto-ub" style={{ fontSize: '12px', fontWeight: 700, color: !isFotoUbicacionValid ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
                           3. Foto Ubicación en Local {!isFotoUbicacionValid && '(OBLIGATORIA)'}
                         </label>
                         <div style={{ marginBottom: '6px' }}>
@@ -1124,31 +1214,33 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                               backgroundColor: compressingField === 'fotoUbicacion' ? '#FEF3C7' : '#EFF6FF',
                               border: '1px dashed var(--blue-600)',
                               borderRadius: '4px',
-                              fontSize: '11px',
+                              fontSize: '12px',
                               color: 'var(--blue-600)',
                               textAlign: 'center',
                               cursor: 'pointer',
                               fontWeight: 600,
                             }}
                           >
-                            {compressingField === 'fotoUbicacion' ? '⏳ Comprimiendo...' : '📁 Subir / Tomar Foto'}
+                            {compressingField === 'fotoUbicacion' ? '⏳ Comprimiendo...' : '📁 Subir foto del ubicación'}
                             <input
                               type="file"
                               accept="image/*"
                               capture="environment"
                               onChange={(e) => handleFileUpload(e, 'fotoUbicacion')}
-                              style={{ display: 'none' }}
+                              className="sr-only"
                             />
                           </label>
                         </div>
                         <input
                           id="reg-foto-ub"
+                        {...fieldA11y('fotoUbicacion', !isFotoUbicacionValid, 'reg-foto-ub-label')}
                           type="text"
                           value={formData.fotoUbicacion.startsWith('data:') ? '[Foto Comprimida en Base64]' : formData.fotoUbicacion}
                           onChange={(e) => handleChange('fotoUbicacion', e.target.value)}
                           placeholder="O ingrese URL directa"
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '10px', borderRadius: 'var(--radius-input)', border: !isFotoUbicacionValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: 'var(--radius-input)', border: !isFotoUbicacionValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
                         />
+                      {renderFieldError('fotoUbicacion')}
                         <div style={{ height: '80px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           {formData.fotoUbicacion ? (
                             <img
@@ -1158,7 +1250,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                               onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://placehold.co/200x100?text=Foto+Ubicacion'; }}
                             />
                           ) : (
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>Sin imagen</span>
+                            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Sin imagen</span>
                           )}
                         </div>
                       </div>
@@ -1297,6 +1389,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     </label>
                     <input
                       id="reg-stamp"
+                        {...fieldA11y('codigoPrecintoSIMEL', Boolean(duplicatePrecintoError), 'reg-stamp-dup')}
                       type="text"
                       className="font-mono"
                       value={formData.precintoSIMEL}
@@ -1310,8 +1403,11 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                         fontWeight: 700,
                       }}
                     />
+                      {renderFieldError('codigoPrecintoSIMEL')}
                     {duplicatePrecintoError && (
                       <div
+                        id="reg-stamp-dup"
+                        role="alert"
                         style={{
                           marginTop: '6px',
                           padding: '8px 12px',
@@ -1365,17 +1461,20 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                       </label>
                       <input
                         id="reg-date2"
+                        {...fieldA11y('fechaProximaCalibracion')}
                         type="date"
                         value={formData.fechaProximaCalibracion}
                         onChange={(e) => handleChange('fechaProximaCalibracion', e.target.value)}
                         style={{ width: '100%', padding: '10px 12px', borderRadius: 'var(--radius-input)', border: '1px solid var(--border-strong)' }}
                       />
+                      {renderFieldError('fechaProximaCalibracion')}
                     </div>
                   </div>
                 </div>
 
                 {errorMsg && (
                   <div
+                    role="alert"
                     style={{
                       marginTop: '16px',
                       backgroundColor: 'var(--danger-bg)',
@@ -1399,7 +1498,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           type="button"
                           className="btn-gov-primary"
                           onClick={() => handleQuickLogin('tecnico')}
-                          style={{ height: '30px', fontSize: '11px', padding: '0 10px' }}
+                          style={{ height: '30px', fontSize: '12px', padding: '0 10px' }}
                         >
                           <UserCheckIcon size={12} />
                           <span>Iniciar Sesión como Técnico y Reintentar</span>
@@ -1444,6 +1543,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     onClick={async () => {
                       setErrorMsg(null);
                       setSuccessMsg(null);
+                      setServerFieldErrors({});
 
                       // Validación preventiva de duplicidad en serial
                       const serialErr = validateSerialLocally(formData.serial);
@@ -1478,12 +1578,9 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           : 'Bascula';
 
                         // División de escala en la unidad de medida declarada
-                        let divisionEscalaNormalizada = parseFloat(formData.divisionEscala) || 5;
-                        if (formData.unidadMedida === 'kg') {
-                          divisionEscalaNormalizada = (parseFloat(formData.divisionEscala) || 5) / 1000;
-                        } else if (formData.unidadMedida === 't') {
-                          divisionEscalaNormalizada = (parseFloat(formData.divisionEscala) || 5) / 1000000;
-                        }
+                        // Misma conversion que usa getNtc2031Validation (maxInGrams / eGram), para que
+                        // el n que ve el usuario sea el que calcula el backend (incluye lb y g).
+                        const divisionEscalaNormalizada = (parseFloat(formData.divisionEscala) || 5) / GRAMOS_POR_UNIDAD[formData.unidadMedida];
 
                         const payload: CreateInstrumentoPayload = {
                           serial: formData.serial.trim().toUpperCase(),
@@ -1623,6 +1720,22 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                         };
                         setSuccessModalData(successData);
                       } catch (err: any) {
+                        const fieldErrors: Array<{ campo: string; mensaje: string }> = Array.isArray(err?.data?.fieldErrors)
+                          ? err.data.fieldErrors
+                          : [];
+                        const mapped: Record<string, string> = {};
+                        for (const fe of fieldErrors) {
+                          if (fe?.campo && FIELD_INPUT_ID[fe.campo] && !mapped[fe.campo]) mapped[fe.campo] = fe.mensaje;
+                        }
+                        if (Object.keys(mapped).length > 0) {
+                          setServerFieldErrors(mapped);
+                          setCurrentStep(1);
+                          setErrorMsg(`El servidor rechazó el registro: corrija los ${Object.keys(mapped).length} campo(s) marcados.`);
+                          toast.error('Hay campos con errores. Revise los mensajes junto a cada campo.', { duration: 6000 });
+                          const firstId = FIELD_INPUT_ID[Object.keys(mapped)[0]];
+                          window.setTimeout(() => document.getElementById(firstId)?.focus(), 50);
+                          return;
+                        }
                         const message = err?.message || 'Error al radicar el instrumento en el backend';
                         toast.error(message, { duration: 6000 });
                         if (message.includes('Unauthorized') || message.includes('401') || message.includes('Forbidden') || message.includes('403')) {
@@ -1708,9 +1821,9 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     >
                       RÓTULO METROLÓGICO OFICIAL
                     </span>
-                    <h4 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--navy-900)', marginTop: '6px', margin: '6px 0 2px 0' }}>
+                    <h2 style={{ fontSize: '14px', fontWeight: 800, color: 'var(--navy-900)', margin: '6px 0 2px 0' }}>
                       SICM-COL · VERIFICADO
-                    </h4>
+                    </h2>
                     <div className="microlabel-sm font-mono" style={{ color: '#78350F' }}>
                       SUPERINTENDENCIA DE INDUSTRIA Y COMERCIO
                     </div>
@@ -1743,7 +1856,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     display: 'grid',
                     gridTemplateColumns: '1fr 1fr',
                     gap: '8px',
-                    fontSize: '11px',
+                    fontSize: '12px',
                   }}
                 >
                   <div>
@@ -1780,7 +1893,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     marginTop: '10px',
                     paddingTop: '6px',
                     borderTop: '1px solid rgba(0,0,0,0.06)',
-                    fontSize: '9px',
+                    fontSize: '12px',
                     fontFamily: 'var(--font-mono)',
                     color: '#78350F',
                     textAlign: 'center',

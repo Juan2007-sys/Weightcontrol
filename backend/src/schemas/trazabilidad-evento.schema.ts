@@ -14,6 +14,8 @@ export enum TipoAccionAuditoria {
   AUTH_LOGIN = 'AUTH_LOGIN',
   AUTH_FAILURE = 'AUTH_FAILURE',
   INSPECTION = 'INSPECTION',
+  ANNUL = 'ANNUL',
+  VERIFICATION_FAILURE = 'VERIFICATION_FAILURE',
 }
 
 export enum EntidadAfectada {

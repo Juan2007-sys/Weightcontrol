@@ -51,7 +51,7 @@ export class QueryCalibracionesDto {
 
   @IsOptional()
   @IsString()
-  sortBy?: string = 'fechaCalibracion';
+  sortBy?: string = 'createdAt';
 
   @IsOptional()
   @IsIn(['asc', 'desc', 'ASC', 'DESC'])

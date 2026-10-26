@@ -1,0 +1,248 @@
+{
+  "login": {
+    "rol": "publico",
+    "violations": [],
+    "passes": 51,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "consulta-publica-404": {
+    "rol": "publico",
+    "violations": [],
+    "passes": 43,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "consulta-publica-dato-real": {
+    "rol": "publico",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          "li[data-index=\"0\"] > div[data-content=\"\"] > div[data-title=\"\"] ::   Element has insufficient color contrast of 4.25 (foreground color: #008a2e, background color: #ecfdf3, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1",
+          ".gov-card > div:nth-child(1) > span ::   Element has insufficient color contrast of 3.76 (foreground color: #ffffff, background color: #059669, font size: 9.8pt (13px), font weight: bold). Expected contrast ratio of 4.5:1"
+        ]
+      },
+      {
+        "id": "svg-img-alt",
+        "impact": "serious",
+        "help": "<svg> elements with an img or image role must have alternative text",
+        "nodes": [
+          "svg[height=\"136\"] ::   Element has no child that is a title   aria-label attribute does not exist or is empty"
+        ]
+      }
+    ],
+    "passes": 44,
+    "lighthouseA11y": 96,
+    "lighthouseFallos": [
+      "color-contrast",
+      "svg-img-alt"
+    ]
+  },
+  "tecnico-dashboard-auditoria": {
+    "rol": "TECNICO",
+    "violations": [],
+    "passes": 51,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "tecnico-registro": {
+    "rol": "TECNICO",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          "div:nth-child(2) > div:nth-child(2) > .microlabel-sm ::   Element has insufficient color contrast of 3.42 (foreground color: #788596, background color: #f1f5f9, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(2) > .microlabel-sm ::   Element has insufficient color contrast of 3.42 (foreground color: #788596, background color: #f1f5f9, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(5) > div:nth-child(3) > div:nth-child(1) > .microlabel ::   Element has insufficient color contrast of 4.09 (foreground color: #0284c7, background color: #ffffff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(1) > div:nth-child(4) ::   Element has insufficient color contrast of 2.56 (foreground color: #94a3b8, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(5) > div:nth-child(3) > div:nth-child(2) > .microlabel ::   Element has insufficient color contrast of 3.76 (foreground color: #059669, background color: #ffffff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(2) > div:nth-child(4) ::   Element has insufficient color contrast of 2.56 (foreground color: #94a3b8, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(3) > div:nth-child(4) ::   Element has insufficient color contrast of 2.56 (foreground color: #94a3b8, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+        ]
+      },
+      {
+        "id": "heading-order",
+        "impact": "moderate",
+        "help": "Heading levels should only increase by one",
+        "nodes": [
+          "h4 ::   Heading order invalid"
+        ]
+      }
+    ],
+    "passes": 45,
+    "lighthouseA11y": 95,
+    "lighthouseFallos": [
+      "color-contrast",
+      "heading-order"
+    ]
+  },
+  "tecnico-instrumentos": {
+    "rol": "TECNICO",
+    "violations": [],
+    "passes": 46,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "tecnico-actas-calibraciones": {
+    "rol": "TECNICO",
+    "violations": [],
+    "passes": 43,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "tecnico-consulta-publica-sesion": {
+    "rol": "TECNICO",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          "li[data-index=\"0\"] > div[data-content=\"\"] > div[data-title=\"\"] ::   Element has insufficient color contrast of 4.25 (foreground color: #008a2e, background color: #ecfdf3, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1",
+          ".gov-card > div:nth-child(1) > span ::   Element has insufficient color contrast of 3.76 (foreground color: #ffffff, background color: #059669, font size: 9.8pt (13px), font weight: bold). Expected contrast ratio of 4.5:1"
+        ]
+      },
+      {
+        "id": "svg-img-alt",
+        "impact": "serious",
+        "help": "<svg> elements with an img or image role must have alternative text",
+        "nodes": [
+          "svg[height=\"136\"] ::   Element has no child that is a title   aria-label attribute does not exist or is empty"
+        ]
+      }
+    ],
+    "passes": 44,
+    "lighthouseA11y": 96,
+    "lighthouseFallos": [
+      "color-contrast",
+      "svg-img-alt"
+    ]
+  },
+  "admin-dashboard-auditoria": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 51,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-registro": {
+    "rol": "ADMIN",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          "div:nth-child(2) > div:nth-child(2) > .microlabel-sm ::   Element has insufficient color contrast of 3.42 (foreground color: #788596, background color: #f1f5f9, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(2) > .microlabel-sm ::   Element has insufficient color contrast of 3.42 (foreground color: #788596, background color: #f1f5f9, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(5) > div:nth-child(3) > div:nth-child(1) > .microlabel ::   Element has insufficient color contrast of 4.09 (foreground color: #0284c7, background color: #ffffff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(1) > div:nth-child(4) ::   Element has insufficient color contrast of 2.56 (foreground color: #94a3b8, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(5) > div:nth-child(3) > div:nth-child(2) > .microlabel ::   Element has insufficient color contrast of 3.76 (foreground color: #059669, background color: #ffffff, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(2) > div:nth-child(4) ::   Element has insufficient color contrast of 2.56 (foreground color: #94a3b8, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "div:nth-child(3) > div:nth-child(3) > div:nth-child(4) ::   Element has insufficient color contrast of 2.56 (foreground color: #94a3b8, background color: #ffffff, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+        ]
+      },
+      {
+        "id": "heading-order",
+        "impact": "moderate",
+        "help": "Heading levels should only increase by one",
+        "nodes": [
+          "h4 ::   Heading order invalid"
+        ]
+      }
+    ],
+    "passes": 45,
+    "lighthouseA11y": 95,
+    "lighthouseFallos": [
+      "color-contrast",
+      "heading-order"
+    ]
+  },
+  "admin-instrumentos": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 46,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-actas-calibraciones": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 43,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-consulta-publica-sesion": {
+    "rol": "ADMIN",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          "li[data-index=\"0\"] > div[data-content=\"\"] > div[data-title=\"\"] ::   Element has insufficient color contrast of 4.25 (foreground color: #008a2e, background color: #ecfdf3, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1",
+          ".gov-card > div:nth-child(1) > span ::   Element has insufficient color contrast of 3.76 (foreground color: #ffffff, background color: #059669, font size: 9.8pt (13px), font weight: bold). Expected contrast ratio of 4.5:1"
+        ]
+      },
+      {
+        "id": "svg-img-alt",
+        "impact": "serious",
+        "help": "<svg> elements with an img or image role must have alternative text",
+        "nodes": [
+          "svg[height=\"136\"] ::   Element has no child that is a title   aria-label attribute does not exist or is empty"
+        ]
+      }
+    ],
+    "passes": 44,
+    "lighthouseA11y": 96,
+    "lighthouseFallos": [
+      "color-contrast",
+      "svg-img-alt"
+    ]
+  },
+  "admin-usuarios": {
+    "rol": "ADMIN",
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "nodes": [
+          "tr:nth-child(8) > td:nth-child(1) > div:nth-child(3) ::   Element has insufficient color contrast of 4.33 (foreground color: #64748b, background color: #fff1f2, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1",
+          "tr:nth-child(10) > td:nth-child(1) > div:nth-child(3) ::   Element has insufficient color contrast of 4.33 (foreground color: #64748b, background color: #fff1f2, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+        ]
+      },
+      {
+        "id": "select-name",
+        "impact": "critical",
+        "help": "Select element must have an accessible name",
+        "nodes": [
+          "select:nth-child(2) ::   Element does not have an implicit (wrapped) <label>   Element does not have an explicit <label>",
+          "select:nth-child(3) ::   Element does not have an implicit (wrapped) <label>   Element does not have an explicit <label>"
+        ]
+      }
+    ],
+    "passes": 45,
+    "lighthouseA11y": 91,
+    "lighthouseFallos": [
+      "color-contrast",
+      "select-name"
+    ]
+  },
+  "admin-trazabilidad": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 42,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-alertas": {
+    "rol": "ADMIN",
+    "error": "no se encontro \"Alertas\": REPÚBLICA DE COLOMBIA\nGOBIERNO NACIONAL\n·\nSUPERINTENDENCIA DE INDUSTRIA Y COMERCIO (SIC)\n·\nRUMP REGISTRO ÚNICO METROLÓGICO\nCANAL DE ATENCIÓN CIUDADANA Y RADICACIÓN\n|\nLÍNEA NACIONAL SIC: 01 8000 910165"
+  }
+}

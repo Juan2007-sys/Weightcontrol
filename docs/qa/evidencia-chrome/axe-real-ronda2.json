@@ -1,0 +1,114 @@
+{
+  "login": {
+    "rol": "publico",
+    "violations": [],
+    "passes": 51,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "consulta-publica-404": {
+    "rol": "publico",
+    "violations": [],
+    "passes": 43,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "consulta-publica-dato-real": {
+    "rol": "publico",
+    "violations": [],
+    "passes": 44,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "tecnico-dashboard-auditoria": {
+    "rol": "TECNICO",
+    "violations": [],
+    "passes": 51,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "tecnico-registro": {
+    "rol": "TECNICO",
+    "violations": [],
+    "passes": 46,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "tecnico-instrumentos": {
+    "rol": "TECNICO",
+    "violations": [],
+    "passes": 46,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "tecnico-actas-calibraciones": {
+    "rol": "TECNICO",
+    "violations": [],
+    "passes": 43,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "tecnico-consulta-publica-sesion": {
+    "rol": "TECNICO",
+    "violations": [],
+    "passes": 44,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-dashboard-auditoria": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 51,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-registro": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 46,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-instrumentos": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 46,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-actas-calibraciones": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 43,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-consulta-publica-sesion": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 44,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-usuarios": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 46,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-trazabilidad": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 42,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  },
+  "admin-parametros": {
+    "rol": "ADMIN",
+    "violations": [],
+    "passes": 43,
+    "lighthouseA11y": 100,
+    "lighthouseFallos": []
+  }
+}

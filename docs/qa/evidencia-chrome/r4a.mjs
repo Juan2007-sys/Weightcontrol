@@ -1,0 +1,17 @@
+import {api,tok} from './lib.mjs'; import fs from 'fs';
+const t=tok(); const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const before=await api('GET','/alertas?limit=100',{token:t.admin});
+const show=(l,items)=>console.log(l,items.map(x=>`${x.serial}:${x.nivelCriticidad}:dias=${JSON.stringify(x.diasRestantes)}`).join(' | '));
+show('ANTES scan (TECNICO ve alertas existentes) NC',before.body.data.filter(x=>/QA-R2-NC/.test(x.serial)));
+show('VENCIDA por fecha (seed)',before.body.data.filter(x=>x.nivelCriticidad==='VENCIDA'&&!/QA-/.test(x.serial)));
+const nc=await api('POST','/instrumentos',{token:t.tecnico,body:{serial:'QA-R4-NC',marca:'QA-Marca',modelo:'QA-R4',tipo:'Bascula',categoriaExactitud:'Clase III',capacidadMaxima:150,capacidadMinima:1,unidadMedida:'kg',divisionEscala:0.05,evidenciasFotograficas:{fotoEquipo:png,fotoPrecinto:png,fotoUbicacion:png},codigoPrecintoSIMEL:'QA-R4-P-NC',fechaUltimaCalibracion:'2026-01-01',fechaProximaCalibracion:'2027-10-01'}});console.log('crear NC inst',nc.status);
+const c=await api('POST','/calibraciones',{token:t.tecnico,body:{instrumentoId:nc.body.id,laboratorioAcreditado:'QA Lab',numeroCertificado:'QA-R4-CERT-NC',fechaCalibracion:'2026-10-24',fechaProximaCalibracion:'2027-10-24',resultado:'No Conforme',patronesUtilizados:[{codigoPatron:'QA-P1',descripcion:'x',certificadoTrazabilidad:'QA-TR-1',fechaVencimientoPatron:'2027-06-01'}],erroresMaximosPermitidos:[{cargaNominal:50,errorEncontrado:0.5,errorMaximoPermitido:0.05,cumple:false}]}});console.log('NC cert',c.status,'anulado',c.body.anulado,'estado',c.body.instrumento?.estado);
+const sc=await api('POST','/alertas/scan',{token:t.tecnico});console.log('scan',sc.status,'generadas',sc.body.alertasGeneradas);
+show('generadas por scan',sc.body.alertas||[]);
+const after=await api('GET','/alertas?limit=100',{token:t.tecnico});
+show('DESPUES NC QA-*',after.body.data.filter(x=>/QA-R[24]-NC/.test(x.serial)));
+show('DESPUES VENCIDA por fecha',after.body.data.filter(x=>x.nivelCriticidad==='VENCIDA'&&!/QA-/.test(x.serial)));
+show('DESPUES otros QA',after.body.data.filter(x=>/QA-(R2-D5|C3)/.test(x.serial)));
+console.log('keys diasRestantes null count',after.body.data.filter(x=>x.diasRestantes===null).length,'undefined',after.body.data.filter(x=>x.diasRestantes===undefined).length);
+const st=await api('GET','/alertas/stats/summary');console.log('stats',JSON.stringify(st.body));
+fs.writeFileSync('r4ids.json',JSON.stringify({inst:nc.body.id,cert:c.body.id}));

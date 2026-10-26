@@ -15,8 +15,12 @@ import {
 import { QRCodeSVG } from 'qrcode.react';
 import { calibracionesService } from '../../services/calibraciones.service';
 import { toast } from 'sonner';
+import { useDialogA11y } from '../../utils/useDialogA11y';
 
 export interface PdfViewerMetadata {
+  /** Número del certificado (folio). Si falta, se usa certIdOrFolio. */
+  numeroCertificado?: string;
+  /** Serial físico del equipo (no es el número de certificado). */
   serial?: string;
   marca?: string;
   modelo?: string;
@@ -81,6 +85,8 @@ export const PdfCertificateViewerModal: React.FC<PdfCertificateViewerModalProps>
     };
   }, [isOpen, certIdOrFolio]);
 
+  const dialogRef = useDialogA11y<HTMLDivElement>(isOpen, onClose);
+
   if (!isOpen) return null;
 
   const handlePrint = () => {
@@ -125,8 +131,11 @@ export const PdfCertificateViewerModal: React.FC<PdfCertificateViewerModalProps>
   return (
     <AnimatePresence>
       <motion.div
+        ref={dialogRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
+        aria-label="Visor del certificado oficial"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
@@ -421,11 +430,19 @@ export const PdfCertificateViewerModal: React.FC<PdfCertificateViewerModalProps>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '12px' }}>
                   <div>
-                    <span style={{ color: '#94A3B8' }}>SERIAL:</span>{' '}
+                    <span style={{ color: '#94A3B8' }}>CERTIFICADO:</span>{' '}
                     <strong className="font-mono" style={{ color: '#38BDF8' }}>
-                      {metadata?.serial || certIdOrFolio}
+                      {metadata?.numeroCertificado || certIdOrFolio}
                     </strong>
                   </div>
+                  {metadata?.serial && (
+                    <div>
+                      <span style={{ color: '#94A3B8' }}>SERIAL DEL EQUIPO:</span>{' '}
+                      <strong className="font-mono" style={{ color: '#38BDF8' }}>
+                        {metadata.serial}
+                      </strong>
+                    </div>
+                  )}
                   {metadata?.marca && (
                     <div>
                       <span style={{ color: '#94A3B8' }}>MARCA / MODELO:</span>{' '}
@@ -517,7 +534,7 @@ export const PdfCertificateViewerModal: React.FC<PdfCertificateViewerModalProps>
                   {metadata?.hashSha256 || 'SHA256: 4a9f88c219e0b1f23789cc01a39fbc88921004128...'}
                 </div>
 
-                <p style={{ fontSize: '10px', color: '#64748B', marginTop: '8px', lineHeight: 1.3, margin: '8px 0 0 0' }}>
+                <p style={{ fontSize: '10px', color: 'var(--text-muted)', marginTop: '8px', lineHeight: 1.3, margin: '8px 0 0 0' }}>
                   Garantía de inmutabilidad: Cualquier alteración del contenido invalida el hash y activa una alerta forense.
                 </p>
               </div>

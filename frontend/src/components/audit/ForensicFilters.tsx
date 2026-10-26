@@ -135,7 +135,6 @@ export const ForensicFilters: React.FC<ForensicFiltersProps> = ({
                     border: '1px solid var(--border-strong)',
                     fontSize: '13px',
                     backgroundColor: '#FFFFFF',
-                    outline: 'none',
                   }}
                 />
               </div>
@@ -161,7 +160,6 @@ export const ForensicFilters: React.FC<ForensicFiltersProps> = ({
                   border: '1px solid var(--border-strong)',
                   fontSize: '13px',
                   backgroundColor: '#FFFFFF',
-                  outline: 'none',
                   color: 'var(--text-primary)',
                 }}
               >
@@ -194,7 +192,6 @@ export const ForensicFilters: React.FC<ForensicFiltersProps> = ({
                   border: '1px solid var(--border-strong)',
                   fontSize: '13px',
                   backgroundColor: '#FFFFFF',
-                  outline: 'none',
                   color: 'var(--text-primary)',
                 }}
               >
@@ -228,7 +225,6 @@ export const ForensicFilters: React.FC<ForensicFiltersProps> = ({
                   border: '1px solid var(--border-strong)',
                   fontSize: '13px',
                   backgroundColor: '#FFFFFF',
-                  outline: 'none',
                   color: 'var(--text-primary)',
                 }}
               >

@@ -1,5 +1,6 @@
 import {
   Injectable,
+  BadRequestException,
   NotFoundException,
   ConflictException,
   Logger,
@@ -7,7 +8,7 @@ import {
   Inject,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, isValidObjectId } from 'mongoose';
 import {
   Instrumento,
   InstrumentoDocument,
@@ -18,6 +19,7 @@ import {
   CategoriaExactitud,
   Calibracion,
   CalibracionDocument,
+  ResultadoCalibracion,
 } from '../../schemas/index.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ValidationEngineService } from './validators/validation-engine.service.js';
@@ -28,6 +30,27 @@ import { QueryInstrumentosDto } from './dto/query-instrumentos.dto.js';
 import { PaginatedResponseDto } from './dto/paginated-response.dto.js';
 import { InstrumentoStatsDto } from './dto/instrumento-stats.dto.js';
 import { PublicVerificationDto } from './dto/public-verification.dto.js';
+import { verifyCertificateSignature } from '../calibraciones/qr-signature.js';
+import type { FieldError } from './validators/instrumento-validator.interface.js';
+
+/** Contexto opcional de una consulta publica (QR firmado y datos para auditoria). */
+export interface PublicVerificationContext {
+  cert?: string;
+  sig?: string;
+  ipAddress?: string;
+  userAgent?: string;
+}
+
+const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Fecha calendario YYYY-MM-DD (UTC): evita que el cliente la muestre un dia antes por zona horaria. */
+export function toFechaCalendario(valor: Date | string | undefined | null): string | undefined {
+  if (!valor) return undefined;
+  const d = new Date(valor);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString().slice(0, 10);
+}
+
+const NO_VERIFICABLE = 'certificado no verificable';
 
 @Injectable()
 export class InstrumentosService {
@@ -72,6 +95,39 @@ export class InstrumentosService {
     return undefined;
   }
 
+  /**
+   * Ejecuta la validacion normativa y, si falla, responde 400 con el contrato historico
+   * `errors: string[]` MAS `fieldErrors: {campo, mensaje}[]` para que la UI asocie cada
+   * error a su campo (HU-02). Se apoya en `validationEngine.assertValid` y solo enriquece
+   * la excepcion cuando el motor no incluyo `fieldErrors`.
+   */
+  private assertInstrumentoValido(data: Parameters<ValidationEngineService['assertValid']>[0]): void {
+    try {
+      this.validationEngine.assertValid(data);
+    } catch (err) {
+      if (err instanceof BadRequestException) {
+        const body = err.getResponse() as any;
+        if (body && typeof body === 'object' && !Array.isArray(body.fieldErrors)) {
+          let fieldErrors: FieldError[] | undefined;
+          try {
+            fieldErrors = this.validationEngine.validate(data)?.fieldErrors;
+          } catch {
+            fieldErrors = undefined;
+          }
+          throw new BadRequestException({
+            ...body,
+            fieldErrors:
+              fieldErrors ??
+              (Array.isArray(body.errors)
+                ? body.errors.map((mensaje: string) => ({ campo: 'general', mensaje }))
+                : []),
+          });
+        }
+      }
+      throw err;
+    }
+  }
+
   async create(
     createDto: CreateInstrumentoDto,
     userId: string,
@@ -79,7 +135,6 @@ export class InstrumentosService {
     userAgent?: string,
   ): Promise<InstrumentoResponseDto> {
     const serialNormalizado = createDto.serial.trim().toUpperCase();
-    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     const existing = await this.instrumentoModel.findOne({
       serial: { $regex: new RegExp(`^${escapeRegex(serialNormalizado)}$`, 'i') },
@@ -107,7 +162,7 @@ export class InstrumentosService {
     );
 
     // Validación NTC 2031 desacoplada (OCP)
-    this.validationEngine.assertValid({
+    this.assertInstrumentoValido({
       serial: serialNormalizado,
       marca: createDto.marca,
       modelo: createDto.modelo,
@@ -162,7 +217,10 @@ export class InstrumentosService {
     return this.mapToResponse(guardado);
   }
 
-  async findAll(query: QueryInstrumentosDto): Promise<PaginatedResponseDto<InstrumentoResponseDto>> {
+  async findAll(
+    query: QueryInstrumentosDto,
+    opciones: { publico?: boolean } = {},
+  ): Promise<PaginatedResponseDto<InstrumentoResponseDto>> {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 10;
     const skip = (page - 1) * limit;
@@ -193,15 +251,20 @@ export class InstrumentosService {
     }
 
     if (query.search && query.search.trim() !== '') {
-      const searchRegex = new RegExp(query.search.trim(), 'i');
+      const searchRegex = new RegExp(escapeRegex(query.search.trim()), 'i');
       filter.$or = [
         { serial: searchRegex },
         { marca: searchRegex },
         { modelo: searchRegex },
         { codigoPrecintoSIMEL: searchRegex },
-        { 'propietario.nombreRazonSocial': searchRegex },
-        { 'propietario.nitRut': searchRegex },
-        { ubicacionFisica: searchRegex },
+        // Sin sesion no se permite buscar por datos del propietario/ubicacion (evita enumerarlos).
+        ...(opciones.publico
+          ? []
+          : [
+              { 'propietario.nombreRazonSocial': searchRegex },
+              { 'propietario.nitRut': searchRegex },
+              { ubicacionFisica: searchRegex },
+            ]),
       ];
     }
 
@@ -289,7 +352,6 @@ export class InstrumentosService {
 
     const previousState = instrumento.toObject();
 
-    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     if (updateDto.serial) {
       const serialNormalizado = updateDto.serial.trim().toUpperCase();
@@ -347,7 +409,7 @@ export class InstrumentosService {
     );
 
     // Validación NTC 2031 con los nuevos datos combinados
-    this.validationEngine.assertValid({
+    this.assertInstrumentoValido({
       serial: instrumento.serial,
       marca: instrumento.marca,
       modelo: instrumento.modelo,
@@ -364,7 +426,11 @@ export class InstrumentosService {
       fechaProximaCalibracion: instrumento.fechaProximaCalibracion,
     });
 
-    instrumento.estado = updateDto.estado || this.calcularEstado(instrumento.fechaProximaCalibracion);
+    // C2: un instrumento vencido por calibracion No Conforme solo se restablece con una Conforme.
+    instrumento.estado =
+      instrumento.motivoVencimiento === 'NO_CONFORME'
+        ? EstadoInstrumento.VENCIDO
+        : updateDto.estado || this.calcularEstado(instrumento.fechaProximaCalibracion);
     instrumento.actualizadoPor = userId;
 
     const actualizado = await instrumento.save();
@@ -444,22 +510,62 @@ export class InstrumentosService {
     return this.mapToResponse(instrumento);
   }
 
+  private async auditarVerificacionFallida(
+    identificador: string,
+    motivo: string,
+    ctx: PublicVerificationContext,
+  ): Promise<void> {
+    try {
+      await this.auditService.logEvent({
+        actionType: TipoAccionAuditoria.VERIFICATION_FAILURE,
+        entityAffected: EntidadAfectada.CERTIFICADO,
+        identifier: (identificador || 'sin-identificador').toString().slice(0, 120),
+        ipAddress: ctx.ipAddress,
+        userAgent: ctx.userAgent,
+        descripcion: `Verificacion publica fallida: ${motivo}`,
+      });
+    } catch {
+      // La auditoria nunca debe impedir responder la consulta publica.
+    }
+  }
+
+  private async noVerificable(
+    identificador: string,
+    motivo: string,
+    ctx: PublicVerificationContext,
+  ): Promise<never> {
+    await this.auditarVerificacionFallida(identificador, motivo, ctx);
+    throw new NotFoundException({
+      statusCode: 404,
+      error: 'Not Found',
+      message: NO_VERIFICABLE,
+    });
+  }
+
   /**
    * Consulta pública sanitizada de verificación ciudadana (HU-05).
    * Cumple estrictamente con la Ley de Habeas Data: NO EXPONE datos del propietario ni usuarios internos.
-   * Si el serial no existe o fue alterado, arroja explícitamente "certificado no verificable".
+   *
+   * Dos modos:
+   *  - QR (ctx.cert presente): exige firma HMAC valida sobre cert+serial y que el cert pertenezca
+   *    a un instrumento con ese serial. Cualquier fallo -> 404 "certificado no verificable".
+   *  - Manual (sin cert): consulta por serial / numero de certificado / folio, sin firma. Decision de
+   *    transicion: la consulta manual no puede firmarse (el ciudadano teclea el dato) y solo devuelve
+   *    datos publicos; un QR sin firma que traiga cert SI se rechaza para que no sirva para falsificar.
+   * Toda verificacion fallida queda auditada (VERIFICATION_FAILURE).
    */
-  async verifyPublic(serial: string): Promise<PublicVerificationDto> {
+  async verifyPublic(serial: string, ctx: PublicVerificationContext = {}): Promise<PublicVerificationDto> {
+    const cert = (ctx.cert ?? '').trim();
+
+    if (cert) {
+      return this.verifyFromQr(serial, cert, ctx);
+    }
+
     if (!serial || serial.trim() === '') {
-      throw new NotFoundException({
-        statusCode: 404,
-        error: 'Not Found',
-        message: 'certificado no verificable',
-      });
+      return this.noVerificable('', 'identificador vacio', ctx);
     }
 
     const serialNormalizado = serial.trim().toUpperCase();
-    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
     let instrumento = await this.instrumentoModel.findOne({
       serial: { $regex: new RegExp(`^${escapeRegex(serialNormalizado)}$`, 'i') },
@@ -482,36 +588,103 @@ export class InstrumentosService {
     }
 
     if (!instrumento) {
-      throw new NotFoundException({
-        statusCode: 404,
-        error: 'Not Found',
-        message: 'certificado no verificable',
-      });
+      return this.noVerificable(serialNormalizado, 'serial o certificado inexistente', ctx);
     }
 
-    const estadoCalculado = this.calcularEstado(instrumento.fechaProximaCalibracion);
-    const esVigente = estadoCalculado === EstadoInstrumento.VIGENTE;
+    return this.buildPublicDto(instrumento, calEncontrada);
+  }
+
+  private async verifyFromQr(
+    serial: string,
+    cert: string,
+    ctx: PublicVerificationContext,
+  ): Promise<PublicVerificationDto> {
+    const serialNormalizado = (serial ?? '').trim().toUpperCase();
+
+    if (!serialNormalizado || !verifyCertificateSignature(cert, serialNormalizado, ctx.sig)) {
+      return this.noVerificable(cert, 'firma del QR ausente o invalida', ctx);
+    }
+    if (!this.calibracionModel) {
+      return this.noVerificable(cert, 'sin acceso a certificados', ctx);
+    }
+
+    const cal: any = await this.calibracionModel
+      .findOne({ numeroCertificado: cert })
+      .populate('instrumento');
+    const instrumento: any = cal?.instrumento;
+
+    if (!cal || !instrumento || (instrumento.serial ?? '').toString().trim().toUpperCase() !== serialNormalizado) {
+      return this.noVerificable(cert, 'el certificado no corresponde al serial', ctx);
+    }
+
+    return this.buildPublicDto(instrumento, cal);
+  }
+
+  /** Consulta publica por ID interno: devuelve unicamente el DTO sanitizado (nunca propietario/creadoPor/evidencias). */
+  async verifyPublicById(id: string, ctx: PublicVerificationContext = {}): Promise<PublicVerificationDto> {
+    if (!id || !isValidObjectId(id)) {
+      return this.noVerificable(id, 'identificador invalido', ctx);
+    }
+    const instrumento = await this.instrumentoModel.findById(id);
+    if (!instrumento) {
+      return this.noVerificable(id, 'instrumento inexistente', ctx);
+    }
+    return this.buildPublicDto(instrumento, null);
+  }
+
+  private async buildPublicDto(instrumento: any, calEncontrada: any): Promise<PublicVerificationDto> {
+    let estadoCalculado = this.calcularEstado(instrumento.fechaProximaCalibracion);
+    // C2: vencido por calibracion No Conforme, la fecha no lo restablece.
+    const noConforme = instrumento.motivoVencimiento === 'NO_CONFORME';
+    if (noConforme) {
+      estadoCalculado = EstadoInstrumento.VENCIDO;
+    }
 
     let ultimoCertificado: any = undefined;
+    let certificadoAnulado = false;
     if (this.calibracionModel) {
       try {
-        const cal: any = calEncontrada || await this.calibracionModel
-          .findOne({ instrumento: instrumento._id as any })
-          .sort({ fechaCalibracion: -1 });
+        let cal: any = calEncontrada;
+        if (!cal) {
+          // Preferir el certificado vigente (no anulado); si todos estan anulados, el mas reciente.
+          cal = await this.calibracionModel
+            .findOne({ instrumento: instrumento._id as any, anulado: { $ne: true } })
+            .sort({ fechaCalibracion: -1 });
+          if (!cal) {
+            cal = await this.calibracionModel
+              .findOne({ instrumento: instrumento._id as any })
+              .sort({ fechaCalibracion: -1 });
+          }
+        }
 
         if (cal) {
+          certificadoAnulado = cal.anulado === true;
+          let reemplazadoPorNumero: string | undefined;
+          if (certificadoAnulado && cal.certificadoReemplazadoPor) {
+            try {
+              const rep: any = await this.calibracionModel.findById(cal.certificadoReemplazadoPor);
+              reemplazadoPorNumero = rep?.numeroCertificado;
+            } catch {
+              reemplazadoPorNumero = undefined;
+            }
+          }
           ultimoCertificado = {
             numeroCertificado: cal.numeroCertificado,
             codigoFolio: cal.codigoFolio || cal.numeroCertificado,
-            fechaCalibracion: cal.fechaCalibracion,
+            fechaCalibracion: toFechaCalendario(cal.fechaCalibracion) as string,
             resultado: cal.resultado,
             pdfUrl: `/api/calibraciones/${cal._id}/pdf`,
+            ...(certificadoAnulado ? { anulado: true, reemplazadoPorNumero } : {}),
           };
         }
       } catch {
         // Fallback si no hay calibración
       }
     }
+
+    const resultadoNoConforme = ultimoCertificado?.resultado === ResultadoCalibracion.NO_CONFORME;
+    const esVigente =
+      estadoCalculado === EstadoInstrumento.VIGENTE && !certificadoAnulado && !noConforme && !resultadoNoConforme;
 
     return {
       serial: instrumento.serial,
@@ -525,13 +698,18 @@ export class InstrumentosService {
       divisionEscala: instrumento.divisionEscala,
       estadoMetrologico: estadoCalculado,
       esVigente,
-      fechaUltimaCalibracion: instrumento.fechaUltimaCalibracion,
-      fechaProximaCalibracion: instrumento.fechaProximaCalibracion,
+      fechaUltimaCalibracion: toFechaCalendario(instrumento.fechaUltimaCalibracion) as string,
+      fechaProximaCalibracion: toFechaCalendario(instrumento.fechaProximaCalibracion) as string,
       codigoPrecintoSIMEL: instrumento.codigoPrecintoSIMEL,
+      ...(certificadoAnulado ? { certificadoAnulado: true } : {}),
       ultimoCertificado,
-      mensajeVerificacion: esVigente
-        ? 'Instrumento verificado y conforme ante el Registro Único de Metrología Legal (RUMP).'
-        : 'Instrumento con calibración vencida o en estado no conforme.',
+      mensajeVerificacion: noConforme || resultadoNoConforme
+        ? 'Instrumento NO CONFORME: la última calibración no cumplió los requisitos metrológicos; certificado anulado y equipo no apto para uso.'
+        : certificadoAnulado
+        ? 'Certificado ANULADO: este certificado ya no es vigente. Consulte el certificado que lo reemplaza.'
+        : esVigente
+          ? 'Instrumento verificado y conforme ante el Registro Único de Metrología Legal (RUMP).'
+          : 'Instrumento con calibración vencida o en estado no conforme.',
     };
   }
 

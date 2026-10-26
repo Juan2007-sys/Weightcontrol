@@ -12,6 +12,15 @@ async function bootstrap() {
   app.useBodyParser('json', { limit: '25mb' });
   app.useBodyParser('urlencoded', { limit: '25mb', extended: true });
 
+  // Detras de un proxy/balanceador (Render, Nginx...) req.ip seria la IP del proxy y el
+  // limite de login (S2) bloquearia a todos juntos. TRUST_PROXY: numero de saltos
+  // (p. ej. 1), lista de IPs/subredes de confianza, o vacio/"false" para desactivarlo.
+  const trustProxy = process.env.TRUST_PROXY?.trim();
+  if (trustProxy && trustProxy !== 'false') {
+    app.set('trust proxy', /^\d+$/.test(trustProxy) ? Number(trustProxy) : trustProxy);
+    logger.log(`trust proxy = ${trustProxy}`);
+  }
+
   app.enableCors({
     origin: true,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',

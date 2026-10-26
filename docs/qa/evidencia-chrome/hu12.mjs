@@ -1,0 +1,16 @@
+import {api,tok} from './lib.mjs';
+const t=tok(); const png='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const base={serial:'QA-BASC-001',marca:'QA-Marca',modelo:'QA-M1',tipo:'Bascula',categoriaExactitud:'Clase III',capacidadMaxima:150,capacidadMinima:1,unidadMedida:'kg',divisionEscala:0.05,evidenciasFotograficas:{fotoEquipo:png,fotoPrecinto:png,fotoUbicacion:png},codigoPrecintoSIMEL:'QA-SIMEL-001',ubicacionFisica:'QA lab',fechaUltimaCalibracion:'2026-10-01',fechaProximaCalibracion:'2027-10-01'};
+const show=(n,r)=>console.log('\n##',n,'=>',r.status,JSON.stringify(r.body).slice(0,700));
+show('create ok (TECNICO)',await api('POST','/instrumentos',{token:t.tecnico,body:base}));
+show('duplicate serial',await api('POST','/instrumentos',{token:t.tecnico,body:base}));
+show('duplicate precinto',await api('POST','/instrumentos',{token:t.tecnico,body:{...base,serial:'QA-BASC-002'}}));
+show('AUDITOR create 403',await api('POST','/instrumentos',{token:t.auditor,body:{...base,serial:'QA-AUD-1'}}));
+show('min>=max',await api('POST','/instrumentos',{token:t.tecnico,body:{...base,serial:'QA-INV-001',codigoPrecintoSIMEL:'QA-S-I1',capacidadMinima:150}}));
+show('bascula e invalid ClaseIII',await api('POST','/instrumentos',{token:t.tecnico,body:{...base,serial:'QA-INV-002',codigoPrecintoSIMEL:'QA-S-I2',divisionEscala:0.5}}));
+show('pesa d>max',await api('POST','/instrumentos',{token:t.tecnico,body:{...base,serial:'QA-INV-003',codigoPrecintoSIMEL:'QA-S-I3',tipo:'Pesa',capacidadMaxima:10,capacidadMinima:0,divisionEscala:20}}));
+show('dinam n<100',await api('POST','/instrumentos',{token:t.tecnico,body:{...base,serial:'QA-INV-004',codigoPrecintoSIMEL:'QA-S-I4',tipo:'Dinamometro',unidadMedida:'kN',capacidadMaxima:10,capacidadMinima:0,divisionEscala:1}}));
+show('campos vacios',await api('POST','/instrumentos',{token:t.tecnico,body:{}}));
+show('GET serial',await api('GET','/instrumentos/serial/QA-BASC-001',{token:t.tecnico}));
+const l=await api('GET','/instrumentos?limit=500&search=QA-',{token:t.tecnico});
+console.log('\nLIST QA serials:',JSON.stringify((l.body.items||l.body.data||l.body).map?.(x=>x.serial)));
