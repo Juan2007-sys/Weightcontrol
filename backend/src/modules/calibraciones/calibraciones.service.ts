@@ -61,6 +61,13 @@ export class CalibracionesService {
       throw new NotFoundException(`Instrumento con ID '${createDto.instrumentoId}' no encontrado.`);
     }
 
+    // HU-08: un equipo inactivo no puede utilizarse en nuevas calibraciones.
+    if (instrumento.activo === false) {
+      throw new BadRequestException(
+        `El instrumento ${instrumento.serial} está inactivo y no puede utilizarse en nuevas calibraciones.`,
+      );
+    }
+
     // 1. Validación de completitud (HU-04 Criterio 4)
     if (!createDto.patronesUtilizados || createDto.patronesUtilizados.length === 0) {
       throw new BadRequestException(

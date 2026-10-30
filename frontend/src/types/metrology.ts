@@ -33,8 +33,10 @@ export interface MetrologicalInstrument {
   hsmKey: string;               // HSM-KEY #9842
   versionFirmware: string;      // 4.12.8-STABLE
   accionRecomendada: string;    // Auto de Sellamiento Inmediato
-  latitud: number;
-  longitud: number;
+  latitud?: number;
+  longitud?: number;
+  /** HU-08: false si el equipo fue inactivado. */
+  activo?: boolean;
   evidenciasFotograficas?: {
     fotoEquipo: string;
     fotoPrecinto: string;

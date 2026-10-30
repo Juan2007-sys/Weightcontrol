@@ -3,6 +3,7 @@ import type { MetrologicalInstrument } from '../../types/metrology';
 import { XIcon, ShieldCheckIcon, AlertTriangleIcon, ShieldAlertIcon, FileTextIcon, LockIcon, CameraIcon, EyeIcon, DownloadIcon } from '../common/Icons';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { useDialogA11y } from '../../utils/useDialogA11y';
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -32,6 +33,11 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
     tag: string;
   } | null>(null);
 
+  // U3: foco atrapado dentro del dialogo, Esc cierra y el foco vuelve al disparador. Los hooks van
+  // antes del retorno temprano; el lightbox es un dialogo propio que tiene prioridad sobre el principal.
+  const dialogRef = useDialogA11y<HTMLDivElement>(!!instrument && !lightboxImage, onClose);
+  const lightboxRef = useDialogA11y<HTMLDivElement>(!!lightboxImage, () => setLightboxImage(null));
+
   if (!instrument) return null;
 
   const fotos = {
@@ -54,6 +60,8 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
 
   return (
     <motion.div
+      ref={dialogRef}
+      tabIndex={-1}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
@@ -813,8 +821,11 @@ export const InspectionDetailModal: React.FC<InspectionDetailModalProps> = ({
       {/* Modal Lightbox de Ampliación de Evidencia Fotográfica */}
       {lightboxImage && (
         <div
+          ref={lightboxRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
+          aria-label="Ampliación de evidencia fotográfica"
           onClick={() => setLightboxImage(null)}
           style={{
             position: 'fixed',

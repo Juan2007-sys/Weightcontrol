@@ -80,6 +80,47 @@ export interface PublicVerificationDto {
   mensajeVerificacion: string;
 }
 
+export type TipoEvidencia = 'fotoEquipo' | 'fotoPrecinto' | 'fotoUbicacion';
+
+export interface EvidenciaItem {
+  tipo: TipoEvidencia;
+  etiqueta: string;
+  url: string;
+  fechaCarga?: string;
+  cargadoPor?: { id: string; nombre?: string; email?: string };
+}
+
+export interface HistorialEvento {
+  id: string;
+  fecha: string;
+  tipoOperacion: string;
+  entidad: string;
+  identificador: string;
+  descripcion?: string;
+  usuario?: { id: string; nombre?: string; email?: string; rol?: string };
+  camposModificados?: string[];
+}
+
+export interface HistorialCalibracion {
+  id: string;
+  numeroCertificado: string;
+  fechaCalibracion: string;
+  fechaProximaCalibracion?: string;
+  resultado: string;
+  anulado: boolean;
+  laboratorio?: string;
+  tecnico?: string;
+}
+
+export interface HistorialInstrumento {
+  instrumentoId: string;
+  serial: string;
+  activo: boolean;
+  totalEventos: number;
+  eventos: HistorialEvento[];
+  calibraciones: HistorialCalibracion[];
+}
+
 export const instrumentosService = {
   getAll: async (params?: {
     page?: number;
@@ -88,6 +129,16 @@ export const instrumentosService = {
     serial?: string;
     estado?: string;
     tipo?: string;
+    /** HU-10 */
+    marca?: string;
+    categoriaExactitud?: string;
+    unidadMedida?: string;
+    capacidadDesde?: number;
+    capacidadHasta?: number;
+    registroDesde?: string;
+    registroHasta?: string;
+    /** HU-08: 'true' solo activos, 'false' solo inactivos, omitido = todos. */
+    activo?: 'true' | 'false';
   }): Promise<{ items: MetrologicalInstrument[]; total: number; raw: BackendInstrumento[] }> => {
     const response = await apiClient.get<PaginatedResponse<BackendInstrumento> | BackendInstrumento[]>('/instrumentos', params);
 
@@ -134,6 +185,34 @@ export const instrumentosService = {
 
   update: async (id: string, data: Partial<CreateInstrumentoPayload>): Promise<BackendInstrumento> => {
     return apiClient.put<BackendInstrumento>(`/instrumentos/${id}`, data);
+  },
+
+  /** HU-07: edicion parcial; el serial no se envia (es el identificador). */
+  patch: async (id: string, data: Record<string, unknown>): Promise<BackendInstrumento> => {
+    return apiClient.patch<BackendInstrumento>(`/instrumentos/${id}`, data);
+  },
+
+  /** HU-06 */
+  getHistorial: async (id: string): Promise<HistorialInstrumento> => {
+    return apiClient.get<HistorialInstrumento>(`/instrumentos/${id}/historial`);
+  },
+
+  /** HU-09 */
+  getEvidencias: async (id: string): Promise<{ serial: string; evidencias: EvidenciaItem[] }> => {
+    return apiClient.get(`/instrumentos/${id}/evidencias`);
+  },
+
+  reemplazarEvidencia: async (
+    id: string,
+    tipo: TipoEvidencia,
+    imagen: string,
+  ): Promise<{ serial: string; evidencias: EvidenciaItem[] }> => {
+    return apiClient.put(`/instrumentos/${id}/evidencias/${tipo}`, { imagen });
+  },
+
+  /** HU-08 */
+  setActivo: async (id: string, activo: boolean, motivo?: string): Promise<BackendInstrumento> => {
+    return apiClient.patch<BackendInstrumento>(`/instrumentos/${id}/activo`, { activo, motivo });
   },
 
   delete: async (id: string): Promise<{ message: string; id: string }> => {

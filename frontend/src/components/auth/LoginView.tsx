@@ -6,25 +6,32 @@ interface LoginViewProps {
   onLoginSuccess: () => void;
 }
 
+/** Solo desarrollo (ver mas abajo): usuarios del seed local. */
+const DEMO_CREDENCIALES = import.meta.env.DEV
+  ? {
+      inspector: { email: 'inspector@sic.gov.co', password: 'Inspector123456!' },
+      tecnico: { email: 'tecnico@oec-onac.org', password: 'Tecnico123456!' },
+      admin: { email: 'admin@weightcontrol.gov.co', password: 'Admin123456!' },
+    }
+  : ({} as Record<string, { email: string; password: string }>);
+
 export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
   const { login } = useAuth();
   const [profile, setProfile] = useState('inspector');
-  const [email, setEmail] = useState('admin@weightcontrol.gov.co');
-  const [password, setPassword] = useState('Admin123456!');
+  // Claves de demostracion: SOLO en desarrollo. En produccion `import.meta.env.DEV` es false y el
+  // bundler elimina estas cadenas, de modo que el formulario arranca vacio y sin credenciales en el codigo.
+  const [email, setEmail] = useState(import.meta.env.DEV ? DEMO_CREDENCIALES.inspector.email : '');
+  const [password, setPassword] = useState(import.meta.env.DEV ? DEMO_CREDENCIALES.inspector.password : '');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
 
   const handleProfileChange = (newProfile: string) => {
     setProfile(newProfile);
-    if (newProfile === 'admin') {
-      setEmail('admin@weightcontrol.gov.co');
-      setPassword('Admin123456!');
-    } else if (newProfile === 'tecnico') {
-      setEmail('tecnico@oec-onac.org');
-      setPassword('Tecnico123456!');
-    } else if (newProfile === 'inspector') {
-      setEmail('inspector@sic.gov.co');
-      setPassword('Inspector123456!');
+    if (!import.meta.env.DEV) return;
+    const demo = DEMO_CREDENCIALES[newProfile as keyof typeof DEMO_CREDENCIALES];
+    if (demo) {
+      setEmail(demo.email);
+      setPassword(demo.password);
     }
   };
 

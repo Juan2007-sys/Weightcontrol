@@ -106,7 +106,7 @@ describe('U1 - Verificación pública por QR (<=30 s y <=3 interacciones)', () =
     // Interacción 1: escanear/abrir el QR. La URL abre directamente la consulta pública...
     expect(app).toMatch(/initialVerification\s*\?\s*'consulta-publica'/);
     // ...e inicia la búsqueda sin clics adicionales (interacciones 2 y 3 = 0).
-    expect(view).toMatch(/if \(initialSerial\.trim\(\)\)\s*{\s*handleSearch\(initialSerial\)/);
+    expect(view).toMatch(/useEffect\(\(\) => {[\s\S]{0,400}initialSerial\.trim\(\)[\s\S]{0,200}handleSearch\(initialSerial\)/);
   });
 });
 

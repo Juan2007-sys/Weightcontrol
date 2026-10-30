@@ -81,6 +81,14 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
         (Array.isArray(data?.message) ? data.message.join(', ') : null) ||
         `Error HTTP ${response.status}: ${response.statusText}`;
 
+      if (response.status === 429) {
+        throw new ApiError(
+          'Demasiados intentos en poco tiempo. Espere un minuto antes de volver a intentarlo.',
+          429,
+          data,
+        );
+      }
+
       // Si el token expiró o es inválido (401), limpiar sesión
       if (response.status === 401) {
         setAuthToken(null);

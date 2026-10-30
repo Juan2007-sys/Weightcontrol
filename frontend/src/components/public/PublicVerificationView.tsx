@@ -68,11 +68,7 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
       // QR firmado (HU-05): se envian cert y sig; la consulta manual por serial va sin ellos.
       const data = await instrumentosService.verifyPublic(target, qr);
       setResult(data);
-      if (data.certificadoAnulado) {
-        toast.warning(`El certificado de ${data.serial} está ANULADO y ya no es vigente.`);
-      } else {
-        toast.success(`Instrumento ${data.serial} verificado con éxito.`);
-      }
+      // El resultado se muestra en pantalla; no se emiten avisos de exito redundantes.
     } catch (err: any) {
       const status = err?.status;
       const msg = err?.message || '';
@@ -131,8 +127,11 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
   };
 
   // Consulta automática al llegar desde un QR o con un serial precargado.
+  const autoSearchedRef = useRef<string>('');
   useEffect(() => {
-    if (initialSerial.trim()) {
+    // StrictMode ejecuta el efecto dos veces en desarrollo: se consulta una sola vez por serial.
+    if (initialSerial.trim() && autoSearchedRef.current !== initialSerial) {
+      autoSearchedRef.current = initialSerial;
       handleSearch(initialSerial);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -270,48 +269,6 @@ export const PublicVerificationView: React.FC<PublicVerificationViewProps> = ({
             >
               <QrCodeIcon size={18} />
               <span>Escanear con Cámara</span>
-            </button>
-          </div>
-
-          {/* Atajos Rápidos de Prueba */}
-          <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: 600 }}>Probar serial:</span>
-            <button
-              type="button"
-              onClick={() => {
-                setSearchSerial('BAL-2025-99201-BOG');
-                handleSearch('BAL-2025-99201-BOG');
-              }}
-              style={{
-                background: '#F1F5F9',
-                border: '1px solid #CBD5E1',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                fontFamily: 'var(--font-mono)',
-                cursor: 'pointer',
-              }}
-            >
-              BAL-2025-99201-BOG (Vigente)
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSearchSerial('SERIAL-FALSO-INEXISTENTE-999');
-                handleSearch('SERIAL-FALSO-INEXISTENTE-999');
-              }}
-              style={{
-                background: '#FEF2F2',
-                border: '1px solid #FCA5A5',
-                color: '#991B1B',
-                padding: '3px 8px',
-                borderRadius: '4px',
-                fontSize: '11px',
-                fontFamily: 'var(--font-mono)',
-                cursor: 'pointer',
-              }}
-            >
-              Probar Serial Inexistente (Error 404)
             </button>
           </div>
         </div>

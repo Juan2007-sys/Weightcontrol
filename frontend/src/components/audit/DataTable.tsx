@@ -4,6 +4,8 @@ import { TableIcon, MapPinIcon, EyeIcon } from '../common/Icons';
 import { InspectionDetailModal } from './InspectionDetailModal';
 import { CartographicView } from './CartographicView';
 
+const PAGE_SIZE = 10;
+
 interface DataTableProps {
   instruments: MetrologicalInstrument[];
 }
@@ -11,6 +13,13 @@ interface DataTableProps {
 export const DataTable: React.FC<DataTableProps> = ({ instruments }) => {
   const [viewMode, setViewMode] = useState<'matriz' | 'cartografia'>('matriz');
   const [selectedInstrument, setSelectedInstrument] = useState<MetrologicalInstrument | null>(null);
+  const [page, setPage] = useState(1);
+
+  // Paginacion real sobre los expedientes cargados (antes mostraba cifras fijas e inventadas).
+  const totalPages = Math.max(1, Math.ceil(instruments.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const firstIdx = (currentPage - 1) * PAGE_SIZE;
+  const pageItems = instruments.slice(firstIdx, firstIdx + PAGE_SIZE);
 
   const getStatusPillClass = (estado: string): string => {
     switch (estado) {
@@ -55,7 +64,14 @@ export const DataTable: React.FC<DataTableProps> = ({ instruments }) => {
               REGISTROS AUDITADOS:
             </span>
             <span style={{ fontSize: '13px', fontWeight: 700, color: 'var(--navy-900)' }}>
-              Mostrando <span className="font-mono">{instruments.length}</span> de <span className="font-mono">1.076</span> expedientes en radar
+              {instruments.length === 0 ? (
+                'Sin expedientes para mostrar'
+              ) : (
+                <>
+                  Mostrando <span className="font-mono">{firstIdx + 1}–{firstIdx + pageItems.length}</span> de{' '}
+                  <span className="font-mono">{instruments.length}</span> expedientes
+                </>
+              )}
             </span>
           </div>
 
@@ -119,7 +135,7 @@ export const DataTable: React.FC<DataTableProps> = ({ instruments }) => {
 
         {/* Vista Cartográfica o Matriz de Datos */}
         {viewMode === 'cartografia' ? (
-          <CartographicView />
+          <CartographicView instruments={instruments} onOpenInstrument={setSelectedInstrument} />
         ) : (
           <div
             className="gov-card"
@@ -192,7 +208,7 @@ export const DataTable: React.FC<DataTableProps> = ({ instruments }) => {
               </thead>
 
               <tbody>
-                {instruments.map((item, index) => {
+                {pageItems.map((item, index) => {
                   const isRowCritical =
                     item.estado === 'CRÍTICA (MEDIDA INMEDIATA)' ||
                     item.estado === 'SUSPENDIDA (CONTROL CAUTELAR)';
@@ -301,7 +317,7 @@ export const DataTable: React.FC<DataTableProps> = ({ instruments }) => {
                           title={`Ver expediente forense de ${item.serial}`}
                         >
                           <EyeIcon size={12} />
-                          <span>Expediente</span>
+                          <span>Ver expediente</span>
                         </button>
                       </td>
                     </tr>
@@ -328,20 +344,25 @@ export const DataTable: React.FC<DataTableProps> = ({ instruments }) => {
               </div>
 
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span className="microlabel-sm" style={{ color: 'var(--text-muted)' }}>PÁGINA 1 DE 216</span>
+                <span className="microlabel-sm" style={{ color: 'var(--text-muted)' }}>
+                  PÁGINA {currentPage} DE {totalPages}
+                </span>
                 <div style={{ display: 'flex', gap: '4px' }}>
                   <button
                     type="button"
-                    disabled
+                    disabled={currentPage <= 1}
                     className="btn-gov-compact"
-                    style={{ opacity: 0.5, cursor: 'not-allowed' }}
+                    onClick={() => setPage(currentPage - 1)}
+                    style={currentPage <= 1 ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                   >
                     ANTERIOR
                   </button>
                   <button
                     type="button"
+                    disabled={currentPage >= totalPages}
                     className="btn-gov-compact"
-                    onClick={() => alert('Cargando registros siguientes desde el nodo central SICM-COL...')}
+                    onClick={() => setPage(currentPage + 1)}
+                    style={currentPage >= totalPages ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
                   >
                     SIGUIENTE
                   </button>

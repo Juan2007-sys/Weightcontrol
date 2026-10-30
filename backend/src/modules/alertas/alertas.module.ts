@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module.js';
 import { AuditModule } from '../audit/audit.module.js';
+import { ConfiguracionModule } from '../configuracion/configuracion.module.js';
 import { AlertasController } from './alertas.controller.js';
 import { AlertasService } from './alertas.service.js';
 import {
@@ -19,7 +20,7 @@ export const CANALES_NOTIFICACION = [
 ];
 
 @Module({
-  imports: [DatabaseModule, AuditModule],
+  imports: [DatabaseModule, AuditModule, ConfiguracionModule],
   controllers: [AlertasController],
   providers: [
     ...CANALES_NOTIFICACION,

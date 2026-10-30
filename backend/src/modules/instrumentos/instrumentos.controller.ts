@@ -28,6 +28,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { RolUsuario } from '../../schemas/usuario.schema.js';
 
+import { SetActivoDto, ReemplazarEvidenciaDto } from './dto/set-activo.dto.js';
 import { PublicVerificationDto } from './dto/public-verification.dto.js';
 import { toPublicListItem } from './dto/public-list-item.js';
 
@@ -143,6 +144,46 @@ export class InstrumentosController {
     const ipAddress = req.ip || req.socket.remoteAddress;
     const userAgent = req.headers['user-agent'];
     return this.instrumentosService.update(id, updateDto, userId, ipAddress, userAgent);
+  }
+
+  // HU-06: historial de eventos y calibraciones del equipo (solo lectura, requiere sesion).
+  @Get(':id/historial')
+  async historial(@Param('id') id: string) {
+    return this.instrumentosService.getHistorial(id);
+  }
+
+  // HU-09: fotografias con tipo, fecha de carga y usuario.
+  @Get(':id/evidencias')
+  async evidencias(@Param('id') id: string) {
+    return this.instrumentosService.getEvidencias(id);
+  }
+
+  @Put(':id/evidencias/:tipo')
+  @Roles(RolUsuario.ADMIN, RolUsuario.TECNICO)
+  async reemplazarEvidencia(
+    @Param('id') id: string,
+    @Param('tipo') tipo: string,
+    @Body() dto: ReemplazarEvidenciaDto,
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ) {
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+    return this.instrumentosService.reemplazarEvidencia(id, tipo, dto.imagen, userId, ipAddress, userAgent);
+  }
+
+  // HU-08: inactivar / reactivar (solo Administrador).
+  @Patch(':id/activo')
+  @Roles(RolUsuario.ADMIN)
+  async setActivo(
+    @Param('id') id: string,
+    @Body() dto: SetActivoDto,
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ): Promise<InstrumentoResponseDto> {
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+    return this.instrumentosService.setActivo(id, dto.activo, dto.motivo, userId, ipAddress, userAgent);
   }
 
   @Delete(':id')

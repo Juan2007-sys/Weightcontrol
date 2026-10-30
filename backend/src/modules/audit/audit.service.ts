@@ -139,6 +139,26 @@ export class AuditService {
     };
   }
 
+  /**
+   * HU-06: todos los eventos asociados a un serial (instrumento y calibraciones/certificados que lo
+   * referencian). Solo lectura: la coleccion de trazabilidad es inmutable.
+   */
+  async findByInstrumentoSerial(serial: string, limit = 500): Promise<any[]> {
+    return this.auditModel
+      .find({
+        $or: [
+          { identifier: serial },
+          { 'newState.instrumentoSerial': serial },
+          { 'previousState.instrumentoSerial': serial },
+        ],
+      })
+      .sort({ timestamp: -1 })
+      .limit(limit)
+      .populate('userId', 'nombre email rol')
+      .lean()
+      .exec();
+  }
+
   async findById(id: string): Promise<TrazabilidadEventoDocument | null> {
     return this.auditModel.findById(id).exec();
   }

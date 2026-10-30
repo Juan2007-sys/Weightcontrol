@@ -13,6 +13,8 @@ import {
   TrazabilidadEventoSchema,
   Alerta,
   AlertaSchema,
+  Configuracion,
+  ConfiguracionSchema,
 } from '../schemas/index.js';
 
 @Module({
@@ -24,6 +26,7 @@ import {
       { name: Certificado.name, schema: CertificadoSchema },
       { name: TrazabilidadEvento.name, schema: TrazabilidadEventoSchema },
       { name: Alerta.name, schema: AlertaSchema },
+      { name: Configuracion.name, schema: ConfiguracionSchema },
     ]),
   ],
   exports: [MongooseModule],

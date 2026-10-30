@@ -15,7 +15,7 @@ import { usuariosService } from '../../services/usuarios.service';
 import type { UserItem, CreateUserData, UpdateUserData } from '../../services/usuarios.service';
 import { auditService } from '../../services/audit.service';
 import type { AuditEventItem } from '../../services/audit.service';
-import { apiClient } from '../../services/apiClient';
+import { configuracionService } from '../../services/configuracion.service';
 import { useAuth } from '../../context/AuthContext';
 
 export const AdminSettingsView: React.FC = () => {
@@ -72,6 +72,7 @@ export const AdminSettingsView: React.FC = () => {
 
   // Parámetros Maestros
   const [thresholdDays, setThresholdDays] = useState('30');
+  const [savingParams, setSavingParams] = useState(false);
   const [periodicityMonths, setPeriodicityMonths] = useState('12');
   const [empToleranceClass, setEmpToleranceClass] = useState('Clase III');
   const timeServer = 'time.nist.gov (NIST UTC-5)';
@@ -203,32 +204,39 @@ export const AdminSettingsView: React.FC = () => {
     }
   };
 
-  // Simular Intento No Autorizado (403 Forbidden)
-  const handleSimulate403 = async () => {
-    try {
-      toast.info('Simulando petición no autorizada hacia endpoint administrativo protegido...');
-      // Hacemos una llamada directa con un rol o token restringido o cabecera
-      await apiClient.post('/usuarios', {
-        nombre: 'Intruso No Autorizado',
-        email: 'hacker@intruso.test',
-        password: 'Password123!',
-        rol: 'ADMIN',
-      }, {
-        headers: { 'X-Simulate-Forbidden': 'true' }
+  // M3: el umbral se guarda en base de datos y aplica en el siguiente escaneo, sin redesplegar.
+  useEffect(() => {
+    if (!isAdmin) return;
+    configuracionService
+      .getUmbralAlerta()
+      .then((d) => setThresholdDays(String(d)))
+      .catch(() => {
+        /* se conserva el valor por defecto en pantalla */
       });
-      toast.success('Petición completada');
-    } catch (err: any) {
-      if (err?.status === 403 || err?.message?.includes('403') || err?.message?.includes('permisos') || err?.message?.includes('Acceso denegado')) {
-        toast.error(`🛑 HTTP 403 Forbidden interceptado: "${err.message}". ¡Incidente registrado en la traza de auditoría inmutable!`);
-      } else {
-        toast.warning(`Resultado: ${err?.message || 'Acceso restringido'}`);
-      }
-    }
-  };
+  }, [isAdmin]);
 
-  const handleSaveParams = (e: React.FormEvent) => {
+  const handleSaveParams = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success('Parámetros maestros actualizados y replicados en los nodos técnicos.');
+    const dias = Number(thresholdDays);
+    if (!Number.isInteger(dias) || dias < 1 || dias > 365) {
+      toast.error('El umbral debe ser un número entero de días entre 1 y 365.');
+      return;
+    }
+    setSavingParams(true);
+    try {
+      const guardado = await configuracionService.setUmbralAlerta(dias);
+      setThresholdDays(String(guardado));
+      toast.success(`Umbral de alerta actualizado a ${guardado} días. Se aplica desde el próximo escaneo, sin redesplegar.`);
+    } catch (err) {
+      const status = (err as { status?: number })?.status;
+      toast.error(
+        status === 403
+          ? 'Solo el Administrador puede modificar los parámetros maestros.'
+          : (err as Error)?.message || 'No fue posible guardar el umbral.',
+      );
+    } finally {
+      setSavingParams(false);
+    }
   };
 
   // Filtrado de usuarios en UI
@@ -310,27 +318,27 @@ export const AdminSettingsView: React.FC = () => {
           }}
         >
           {isAdmin && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('usuarios')}
-            style={{
-              padding: '10px 20px',
-              fontWeight: 700,
-              fontSize: '13px',
-              border: 'none',
-              backgroundColor: 'transparent',
-              cursor: 'pointer',
-              color: activeTab === 'usuarios' ? 'var(--navy-900)' : 'var(--text-muted)',
-              borderBottom: activeTab === 'usuarios' ? '3px solid var(--blue-600)' : '3px solid transparent',
-              marginBottom: '-2px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <UsersIcon size={16} />
-            <span>1. Gestión de Usuarios y Roles (RBAC)</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('usuarios')}
+              style={{
+                padding: '10px 20px',
+                fontWeight: 700,
+                fontSize: '13px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+                color: activeTab === 'usuarios' ? 'var(--navy-900)' : 'var(--text-muted)',
+                borderBottom: activeTab === 'usuarios' ? '3px solid var(--blue-600)' : '3px solid transparent',
+                marginBottom: '-2px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <UsersIcon size={16} />
+              <span>1. Gestión de Usuarios y Roles (RBAC)</span>
+            </button>
 
           )}
 
@@ -353,31 +361,31 @@ export const AdminSettingsView: React.FC = () => {
             }}
           >
             <ActivityIcon size={16} />
-            <span>2. Trazabilidad Forense y Eventos 403</span>
+            <span>2. Trazabilidad Forense </span>
           </button>
 
           {isAdmin && (
-          <button
-            type="button"
-            onClick={() => setActiveTab('parametros')}
-            style={{
-              padding: '10px 20px',
-              fontWeight: 700,
-              fontSize: '13px',
-              border: 'none',
-              backgroundColor: 'transparent',
-              cursor: 'pointer',
-              color: activeTab === 'parametros' ? 'var(--navy-900)' : 'var(--text-muted)',
-              borderBottom: activeTab === 'parametros' ? '3px solid var(--blue-600)' : '3px solid transparent',
-              marginBottom: '-2px',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            <ShieldCheckIcon size={16} />
-            <span>3. Parámetros Maestros y Criptografía</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('parametros')}
+              style={{
+                padding: '10px 20px',
+                fontWeight: 700,
+                fontSize: '13px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+                color: activeTab === 'parametros' ? 'var(--navy-900)' : 'var(--text-muted)',
+                borderBottom: activeTab === 'parametros' ? '3px solid var(--blue-600)' : '3px solid transparent',
+                marginBottom: '-2px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <ShieldCheckIcon size={16} />
+              <span>3. Parámetros Maestros y Criptografía</span>
+            </button>
           )}
         </div>
 
@@ -487,22 +495,6 @@ export const AdminSettingsView: React.FC = () => {
 
               {/* Botones de Acción */}
               <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  type="button"
-                  onClick={handleSimulate403}
-                  className="btn-gov-compact"
-                  style={{
-                    borderColor: 'var(--warn)',
-                    color: '#92400E',
-                    backgroundColor: '#FEF3C7',
-                    fontWeight: 700,
-                  }}
-                  title="Simula un intento de acceso indebido para comprobar el error HTTP 403 y la traza"
-                >
-                  <ShieldAlertIcon size={15} />
-                  <span>Probar 403 Forbidden</span>
-                </button>
-
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(true)}
@@ -790,11 +782,13 @@ export const AdminSettingsView: React.FC = () => {
                   <input id="adm-f1"
                     type="number"
                     value={thresholdDays}
+                    min={1}
+                    max={365}
                     onChange={(e) => setThresholdDays(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-input)', border: '1px solid var(--border-strong)', fontFamily: 'var(--font-mono)' }}
                   />
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Define cuándo el estado de un instrumento cambia automáticamente a 'POR VENCER (&lt;30 DÍAS)'.
+                    Define cuándo el estado de un instrumento cambia automáticamente a 'POR VENCER' (hoy: {thresholdDays} días). Se guarda en el servidor y aplica en el próximo escaneo.
                   </span>
                 </div>
 
@@ -805,11 +799,13 @@ export const AdminSettingsView: React.FC = () => {
                   <input id="adm-f2"
                     type="number"
                     value={periodicityMonths}
+                    readOnly
+                    aria-readonly="true"
                     onChange={(e) => setPeriodicityMonths(e.target.value)}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-input)', border: '1px solid var(--border-strong)', fontFamily: 'var(--font-mono)' }}
                   />
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    12 meses estándar según Decreto 1074 de 2015 para básculas IPFNA.
+                    12 meses estándar según Decreto 1074 de 2015 para básculas IPFNA (informativo, no configurable).
                   </span>
                 </div>
 
@@ -829,9 +825,9 @@ export const AdminSettingsView: React.FC = () => {
                   </select>
                 </div>
 
-                <button type="submit" className="btn-gov-primary" style={{ marginTop: '8px' }}>
+                <button type="submit" className="btn-gov-primary" style={{ marginTop: '8px' }} disabled={savingParams}>
                   <CheckIcon size={14} />
-                  <span>Guardar Parámetros Regulatorios</span>
+                  <span>{savingParams ? 'Guardando…' : 'Guardar Parámetros Regulatorios'}</span>
                 </button>
               </form>
             </div>

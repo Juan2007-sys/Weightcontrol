@@ -20,8 +20,13 @@ import {
   Calibracion,
   CalibracionDocument,
   ResultadoCalibracion,
+  Usuario,
+  UsuarioDocument,
+  TIPOS_EVIDENCIA,
 } from '../../schemas/index.js';
+import type { TipoEvidencia } from '../../schemas/index.js';
 import { AuditService } from '../audit/audit.service.js';
+import { ConfiguracionService } from '../configuracion/configuracion.service.js';
 import { ValidationEngineService } from './validators/validation-engine.service.js';
 import { CreateInstrumentoDto } from './dto/create-instrumento.dto.js';
 import { UpdateInstrumentoDto } from './dto/update-instrumento.dto.js';
@@ -64,9 +69,17 @@ export class InstrumentosService {
     @Optional()
     @InjectModel(Calibracion.name)
     private readonly calibracionModel?: Model<CalibracionDocument>,
+    @Optional()
+    @InjectModel(Usuario.name)
+    private readonly usuarioModel?: Model<UsuarioDocument>,
+    @Optional()
+    private readonly configuracionService?: ConfiguracionService,
   ) {}
 
-  calcularEstado(fechaProxima: Date, umbralDias: number = 30): EstadoInstrumento {
+  calcularEstado(
+    fechaProxima: Date,
+    umbralDias: number = this.configuracionService?.umbralDiasCache ?? 30,
+  ): EstadoInstrumento {
     const ahora = new Date();
     const proxima = new Date(fechaProxima);
 
@@ -188,6 +201,8 @@ export class InstrumentosService {
       fechaProximaCalibracion: fechaProxima,
       numeroDivisionesVerificacion: numeroDivisiones,
       estado,
+      activo: true,
+      evidenciasMeta: this.metaEvidencias(TIPOS_EVIDENCIA, userId),
       creadoPor: userId,
       actualizadoPor: userId,
     });
@@ -240,6 +255,30 @@ export class InstrumentosService {
       filter.unidadMedida = query.unidadMedida;
     }
 
+    if (query.marca && query.marca.trim() !== '') {
+      filter.marca = new RegExp(escapeRegex(query.marca.trim()), 'i');
+    }
+    if (query.activo === 'true') {
+      filter.activo = { $ne: false };
+    } else if (query.activo === 'false') {
+      filter.activo = false;
+    }
+    if (query.capacidadDesde !== undefined || query.capacidadHasta !== undefined) {
+      filter.capacidadMaxima = {};
+      if (query.capacidadDesde !== undefined) filter.capacidadMaxima.$gte = Number(query.capacidadDesde);
+      if (query.capacidadHasta !== undefined) filter.capacidadMaxima.$lte = Number(query.capacidadHasta);
+    }
+    if (query.registroDesde || query.registroHasta) {
+      filter.createdAt = {};
+      if (query.registroDesde) filter.createdAt.$gte = new Date(query.registroDesde);
+      if (query.registroHasta) {
+        // Fecha calendario: incluye todo el dia final.
+        const hasta = new Date(query.registroHasta);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(query.registroHasta)) hasta.setUTCHours(23, 59, 59, 999);
+        filter.createdAt.$lte = hasta;
+      }
+    }
+
     if (query.fechaDesde || query.fechaHasta) {
       filter.fechaProximaCalibracion = {};
       if (query.fechaDesde) {
@@ -280,6 +319,7 @@ export class InstrumentosService {
         .limit(limit)
         .populate('creadoPor', 'nombre email rol')
         .populate('actualizadoPor', 'nombre email rol')
+        .populate('inactivadoPor', 'nombre email rol')
         .exec(),
       this.instrumentoModel.countDocuments(filter).exec(),
     ]);
@@ -353,18 +393,11 @@ export class InstrumentosService {
     const previousState = instrumento.toObject();
 
 
-    if (updateDto.serial) {
-      const serialNormalizado = updateDto.serial.trim().toUpperCase();
-      if (serialNormalizado !== instrumento.serial) {
-        const existing = await this.instrumentoModel.findOne({
-          serial: { $regex: new RegExp(`^${escapeRegex(serialNormalizado)}$`, 'i') },
-          _id: { $ne: id },
-        });
-        if (existing) {
-          throw new ConflictException(`Ya existe otro instrumento registrado con el serial '${serialNormalizado}'.`);
-        }
-        instrumento.serial = serialNormalizado;
-      }
+    // HU-07: el numero de serie es el identificador del equipo y no se modifica.
+    if (updateDto.serial && updateDto.serial.trim().toUpperCase() !== instrumento.serial) {
+      throw new BadRequestException(
+        'El número de serie es el identificador del equipo y no puede modificarse.',
+      );
     }
 
     if (updateDto.marca !== undefined) instrumento.marca = updateDto.marca;
@@ -375,7 +408,19 @@ export class InstrumentosService {
     if (updateDto.capacidadMinima !== undefined) instrumento.capacidadMinima = updateDto.capacidadMinima;
     if (updateDto.unidadMedida !== undefined) instrumento.unidadMedida = updateDto.unidadMedida;
     if (updateDto.divisionEscala !== undefined) instrumento.divisionEscala = updateDto.divisionEscala;
-    if (updateDto.evidenciasFotograficas !== undefined) instrumento.evidenciasFotograficas = updateDto.evidenciasFotograficas as any;
+    if (updateDto.evidenciasFotograficas !== undefined) {
+      const cambiadas = TIPOS_EVIDENCIA.filter(
+        (t) => updateDto.evidenciasFotograficas![t] !== instrumento.evidenciasFotograficas?.[t],
+      );
+      instrumento.evidenciasFotograficas = updateDto.evidenciasFotograficas as any;
+      if (cambiadas.length > 0) {
+        instrumento.evidenciasMeta = {
+          ...(instrumento.evidenciasMeta || {}),
+          ...this.metaEvidencias(cambiadas, userId),
+        };
+        instrumento.markModified?.('evidenciasMeta');
+      }
+    }
     if (updateDto.codigoPrecintoSIMEL !== undefined) {
       if (updateDto.codigoPrecintoSIMEL) {
         const precintoNormalizado = updateDto.codigoPrecintoSIMEL.trim().toUpperCase();
@@ -480,6 +525,201 @@ export class InstrumentosService {
     return {
       message: `Instrumento con serial '${instrumento.serial}' eliminado exitosamente.`,
       id,
+    };
+  }
+
+  private metaEvidencias(tipos: TipoEvidencia[], userId: string) {
+    const ahora = new Date();
+    const meta: Partial<Record<TipoEvidencia, { fechaCarga: Date; cargadoPor: string }>> = {};
+    for (const t of tipos) meta[t] = { fechaCarga: ahora, cargadoPor: userId };
+    return meta;
+  }
+
+  /** HU-08: inactiva o reactiva un equipo sin borrar su informacion historica. */
+  async setActivo(
+    id: string,
+    activo: boolean,
+    motivo: string | undefined,
+    userId: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<InstrumentoResponseDto> {
+    const instrumento = await this.instrumentoModel.findById(id);
+    if (!instrumento) {
+      throw new NotFoundException(`Instrumento con ID '${id}' no encontrado.`);
+    }
+    const estabaActivo = instrumento.activo !== false;
+    if (estabaActivo === activo) {
+      throw new ConflictException(
+        `El instrumento ${instrumento.serial} ya se encuentra ${activo ? 'activo' : 'inactivo'}.`,
+      );
+    }
+    if (!activo && (!motivo || motivo.trim().length < 5)) {
+      throw new BadRequestException('Debe indicar el motivo de la inactivación (mínimo 5 caracteres).');
+    }
+
+    instrumento.activo = activo;
+    instrumento.fechaInactivacion = activo ? undefined : new Date();
+    instrumento.inactivadoPor = activo ? undefined : userId;
+    instrumento.motivoInactivacion = activo ? undefined : motivo!.trim();
+    instrumento.actualizadoPor = userId;
+    const guardado = await instrumento.save();
+
+    await this.auditService.logEvent({
+      userId,
+      actionType: TipoAccionAuditoria.STATUS_CHANGE,
+      entityAffected: EntidadAfectada.INSTRUMENTO,
+      identifier: guardado.serial,
+      previousState: { activo: estabaActivo },
+      newState: { activo, motivo: motivo?.trim() },
+      ipAddress,
+      userAgent,
+      descripcion: `${activo ? 'Reactivación' : 'Inactivación'} de instrumento serial ${guardado.serial}${
+        activo ? '' : `. Motivo: ${motivo!.trim()}`
+      }`,
+    });
+    return this.mapToResponse(guardado);
+  }
+
+  private async nombresUsuarios(ids: string[]): Promise<Record<string, { nombre?: string; email?: string }>> {
+    const unicos = [...new Set(ids.filter(Boolean))];
+    if (!this.usuarioModel || unicos.length === 0) return {};
+    const usuarios: any[] = await (this.usuarioModel as any)
+      .find({ _id: { $in: unicos } }, 'nombre email')
+      .lean();
+    return Object.fromEntries(usuarios.map((u) => [String(u._id), { nombre: u.nombre, email: u.email }]));
+  }
+
+  /** HU-09: fotografias del equipo con tipo, fecha de carga y usuario que las cargo. */
+  async getEvidencias(id: string) {
+    const instrumento = await this.instrumentoModel.findById(id);
+    if (!instrumento) {
+      throw new NotFoundException(`Instrumento con ID '${id}' no encontrado.`);
+    }
+    const meta: Record<string, any> = instrumento.evidenciasMeta || {};
+    const quienes = await this.nombresUsuarios(
+      TIPOS_EVIDENCIA.map((t) => (meta[t]?.cargadoPor ? String(meta[t].cargadoPor) : '')),
+    );
+    const etiquetas: Record<TipoEvidencia, string> = {
+      fotoEquipo: 'Equipo',
+      fotoPrecinto: 'Precinto',
+      fotoUbicacion: 'Ubicación',
+    };
+    return {
+      instrumentoId: String(instrumento._id),
+      serial: instrumento.serial,
+      evidencias: TIPOS_EVIDENCIA.filter((t) => instrumento.evidenciasFotograficas?.[t]).map((t) => {
+        const uid = meta[t]?.cargadoPor ? String(meta[t].cargadoPor) : undefined;
+        return {
+          tipo: t,
+          etiqueta: etiquetas[t],
+          url: instrumento.evidenciasFotograficas[t],
+          fechaCarga: meta[t]?.fechaCarga ?? (instrumento as any).createdAt,
+          cargadoPor: uid ? { id: uid, ...(quienes[uid] || {}) } : undefined,
+        };
+      }),
+    };
+  }
+
+  /** HU-09: reemplaza una fotografia concreta. Siempre queda asociada al equipo y al usuario. */
+  async reemplazarEvidencia(
+    id: string,
+    tipo: string,
+    imagen: string,
+    userId: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ) {
+    if (!(TIPOS_EVIDENCIA as string[]).includes(tipo)) {
+      throw new BadRequestException(`Tipo de evidencia inválido. Use: ${TIPOS_EVIDENCIA.join(', ')}.`);
+    }
+    if (!imagen || typeof imagen !== 'string' || !imagen.trim()) {
+      throw new BadRequestException('La imagen de la evidencia es obligatoria.');
+    }
+    const instrumento = await this.instrumentoModel.findById(id);
+    if (!instrumento) {
+      throw new NotFoundException(`Instrumento con ID '${id}' no encontrado.`);
+    }
+    const t = tipo as TipoEvidencia;
+    instrumento.evidenciasFotograficas = { ...instrumento.evidenciasFotograficas, [t]: imagen.trim() } as any;
+    instrumento.evidenciasMeta = { ...(instrumento.evidenciasMeta || {}), ...this.metaEvidencias([t], userId) };
+    instrumento.markModified?.('evidenciasMeta');
+    instrumento.actualizadoPor = userId;
+    await instrumento.save();
+
+    await this.auditService.logEvent({
+      userId,
+      actionType: TipoAccionAuditoria.UPDATE,
+      entityAffected: EntidadAfectada.INSTRUMENTO,
+      identifier: instrumento.serial,
+      newState: { evidenciaActualizada: t },
+      ipAddress,
+      userAgent,
+      descripcion: `Actualización de evidencia fotográfica (${t}) del instrumento ${instrumento.serial}`,
+    });
+    return this.getEvidencias(id);
+  }
+
+  /** HU-06: historial de eventos y calibraciones asociado al serial. Solo lectura. */
+  async getHistorial(id: string) {
+    const instrumento = await this.instrumentoModel.findById(id);
+    if (!instrumento) {
+      throw new NotFoundException(`Instrumento con ID '${id}' no encontrado.`);
+    }
+    const serial = instrumento.serial;
+    const eventos = await this.auditService.findByInstrumentoSerial(serial);
+
+    const camposIgnorados = new Set([
+      '_id', '__v', 'createdAt', 'updatedAt', 'actualizadoPor', 'evidenciasFotograficas', 'evidenciasMeta',
+    ]);
+    const cambios = (ev: any): string[] => {
+      const prev = ev.previousState || {};
+      const next = ev.newState || {};
+      return Object.keys(next)
+        .filter((k) => !camposIgnorados.has(k) && JSON.stringify(prev[k]) !== JSON.stringify(next[k]))
+        .slice(0, 12);
+    };
+
+    const calibraciones: any[] = this.calibracionModel
+      ? await (this.calibracionModel as any)
+          .find({ instrumento: instrumento._id })
+          .sort({ fechaCalibracion: -1 })
+          .populate('tecnico', 'nombre email')
+          .lean()
+      : [];
+
+    return {
+      instrumentoId: String(instrumento._id),
+      serial,
+      activo: instrumento.activo !== false,
+      totalEventos: eventos.length,
+      eventos: eventos.map((ev) => ({
+        id: String(ev._id),
+        fecha: ev.timestamp,
+        tipoOperacion: ev.actionType,
+        entidad: ev.entityAffected,
+        identificador: ev.identifier,
+        descripcion: ev.descripcion,
+        usuario: ev.userId
+          ? {
+              id: String(ev.userId._id ?? ev.userId),
+              nombre: ev.userId.nombre,
+              email: ev.userId.email,
+              rol: ev.userRole ?? ev.userId.rol,
+            }
+          : undefined,
+        camposModificados: ev.actionType === 'UPDATE' ? cambios(ev) : undefined,
+      })),
+      calibraciones: calibraciones.map((c) => ({
+        id: String(c._id),
+        numeroCertificado: c.numeroCertificado,
+        fechaCalibracion: c.fechaCalibracion,
+        fechaProximaCalibracion: c.fechaProximaCalibracion,
+        resultado: c.resultado,
+        anulado: c.anulado === true,
+        laboratorio: c.laboratorioAcreditado,
+        tecnico: c.tecnico?.nombre,
+      })),
     };
   }
 
@@ -733,6 +973,11 @@ export class InstrumentosService {
       fechaUltimaCalibracion: doc.fechaUltimaCalibracion,
       fechaProximaCalibracion: doc.fechaProximaCalibracion,
       estado: doc.estado,
+      activo: doc.activo !== false,
+      fechaInactivacion: doc.fechaInactivacion,
+      inactivadoPor: doc.inactivadoPor,
+      motivoInactivacion: doc.motivoInactivacion,
+      evidenciasMeta: doc.evidenciasMeta as any,
       creadoPor: doc.creadoPor,
       actualizadoPor: doc.actualizadoPor,
       createdAt: (doc as any).createdAt,

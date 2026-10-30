@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module.js';
 import { AuditModule } from '../audit/audit.module.js';
+import { ConfiguracionModule } from '../configuracion/configuracion.module.js';
 import { InstrumentosController } from './instrumentos.controller.js';
 import { InstrumentosService } from './instrumentos.service.js';
 import { BasculaValidator } from './validators/bascula.validator.js';
@@ -19,7 +20,7 @@ export const INSTRUMENTO_VALIDATOR_CLASSES = [
 ];
 
 @Module({
-  imports: [DatabaseModule, AuditModule],
+  imports: [DatabaseModule, AuditModule, ConfiguracionModule],
   controllers: [InstrumentosController],
   providers: [
     ...INSTRUMENTO_VALIDATOR_CLASSES,

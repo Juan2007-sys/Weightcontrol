@@ -107,15 +107,17 @@ export const TitleBlock: React.FC<TitleBlockProps> = ({ onExportReport, onNewIns
             <span>Descargar informe (.PDF / .CSV)</span>
           </button>
 
-          <button
-            type="button"
-            className="btn-gov-primary"
-            onClick={onNewInspection}
-            title="Iniciar diligencia de inspección metrológica legal"
-          >
-            <BalanceIcon size={16} />
-            <span>Radicar Inspección Técnica</span>
-          </button>
+          {onNewInspection && (
+            <button
+              type="button"
+              className="btn-gov-primary"
+              onClick={onNewInspection}
+              title="Iniciar diligencia de inspección metrológica legal"
+            >
+              <BalanceIcon size={16} />
+              <span>Radicar Inspección Técnica</span>
+            </button>
+          )}
         </div>
       </div>
     </section>

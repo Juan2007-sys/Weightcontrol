@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import imageCompression from 'browser-image-compression';
-import { QrCodeIcon, CheckIcon, AlertTriangleIcon, UserCheckIcon, ShieldCheckIcon } from '../common/Icons';
+import { QrCodeIcon, CheckIcon, AlertTriangleIcon } from '../common/Icons';
 import { instrumentosService } from '../../services/instrumentos.service';
 import type { CreateInstrumentoPayload } from '../../services/instrumentos.service';
 import type { MetrologicalInstrument } from '../../types/metrology';
@@ -31,7 +31,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
   existingInstruments = [],
   onConsultSerialImmediately,
 }) => {
-  const { user, isAuthenticated, login } = useAuth();
+  const { user, isAuthenticated } = useAuth();
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -160,30 +160,35 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
     return null;
   };
 
-  // Datos del formulario - Incluye serial existente por defecto para alertar duplicidad de inmediato
+  // Datos del formulario: arranca vacio; cada campo guia con su placeholder. Los selectores
+  // (tipo, clase, unidad) conservan una opcion valida porque no admiten estar vacios.
   const [formData, setFormData] = useState({
-    serial: 'BAL-2025-99201-BOG',
+    serial: '',
     tipo: 'IPFNA Clase III (Báscula de mostrador comercial)',
     categoriaExactitud: 'Clase III' as 'Clase I' | 'Clase II' | 'Clase III' | 'Clase IIII',
     unidadMedida: 'kg' as 'kg' | 'g' | 'lb' | 't',
-    marca: 'Torrey',
-    modelo: 'L-EQ-10/20',
-    capacidadMax: '30',
-    capacidadMin: '0.1',
-    divisionEscala: '5',
-    fotoEquipo: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800',
-    fotoPrecinto: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800',
-    fotoUbicacion: 'https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=800',
-    establecimiento: 'DISTRIBUIDORA DE ALIMENTOS DEL CENTRO S.A.S.',
-    nit: '901.442.190-3',
-    departamento: 'Cundinamarca',
-    municipio: 'Bogotá D.C.',
-    direccion: 'Carrera 13 # 65-22 Local 102',
-    precintoSIMEL: 'STAMP-CO-9982415',
-    oecAcreditado: 'ONAC-18-LAB-042 (Laboratorio Metrológico Nacional)',
-    fechaUltimaCalibracion: '2025-05-14',
-    fechaProximaCalibracion: '2026-05-14',
+    marca: '',
+    modelo: '',
+    capacidadMax: '',
+    capacidadMin: '',
+    divisionEscala: '',
+    fotoEquipo: '',
+    fotoPrecinto: '',
+    fotoUbicacion: '',
+    establecimiento: '',
+    nit: '',
+    departamento: '',
+    municipio: '',
+    direccion: '',
+    precintoSIMEL: '',
+    oecAcreditado: '',
+    fechaUltimaCalibracion: '',
+    fechaProximaCalibracion: '',
   });
+
+  // Campos que la persona ya toco: un campo vacio no se pinta en rojo hasta que se interactua con el.
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const shown = (field: string, valid: boolean) => valid || !touched[field];
 
   // Validar el serial inicial al montar el componente
   useEffect(() => {
@@ -239,6 +244,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    setTouched((prev) => (prev[field] ? prev : { ...prev, [field]: true }));
     const backendField = FORM_TO_BACKEND_FIELD[field] ?? field;
     setServerFieldErrors((prev) => {
       if (!prev[backendField]) return prev;
@@ -432,21 +438,6 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
     setCurrentStep(targetStep);
   };
 
-  const handleQuickLogin = async (role: 'tecnico' | 'admin') => {
-    try {
-      if (role === 'tecnico') {
-        await login('tecnico@oec-onac.org', 'Tecnico123456!');
-        toast.success('Sesión iniciada como Técnico Metrólogo Juan Pérez');
-      } else {
-        await login('admin@weightcontrol.gov.co', 'Admin123456!');
-        toast.success('Sesión iniciada como Administrador Central SIC');
-      }
-      setErrorMsg(null);
-    } catch {
-      toast.error('No se pudo iniciar sesión con el backend');
-    }
-  };
-
   const progressPercentage = currentStep === 1 ? 33 : currentStep === 2 ? 66 : 100;
 
   return (
@@ -481,58 +472,6 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
         </div>
 
         {/* Banner de Verificación de Sesión Técnica para Demostración */}
-        {!canRegister && (
-          <div
-            className="gov-card"
-            style={{
-              padding: '14px 20px',
-              marginBottom: '20px',
-              backgroundColor: '#EFF6FF',
-              border: '1px solid #BFDBFE',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              flexWrap: 'wrap',
-              gap: '12px',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{ color: 'var(--blue-600)' }}>
-                <ShieldCheckIcon size={22} />
-              </div>
-              <div>
-                <div style={{ fontSize: '13px', fontWeight: 700, color: 'var(--navy-900)' }}>
-                  {isAuthenticated && user
-                    ? `Sesión activa con perfil ${user.rol} (Modo Solo Lectura)`
-                    : 'Modo demostración / Sin autenticación técnica'}
-                </div>
-                <div style={{ fontSize: '12px', color: '#1E40AF' }}>
-                  Para radicar en la base de datos de MongoDB con firma digital, activa una sesión autorizada:
-                </div>
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                type="button"
-                className="btn-gov-primary"
-                onClick={() => handleQuickLogin('tecnico')}
-                style={{ height: '34px', fontSize: '12px' }}
-              >
-                <UserCheckIcon size={14} />
-                <span>Ingresar como Técnico</span>
-              </button>
-              <button
-                type="button"
-                className="btn-gov-secondary"
-                onClick={() => handleQuickLogin('admin')}
-                style={{ height: '34px', fontSize: '12px' }}
-              >
-                <span>Como Admin</span>
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Stepper Horizontal de 3 Fases con Barra de Progreso */}
         <div
           className="gov-card"
@@ -726,26 +665,6 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                         <button
                           type="button"
                           onClick={() => {
-                            handleChange('serial', 'BAL-2025-99201-BOG');
-                            checkSerialInDatabase('BAL-2025-99201-BOG');
-                          }}
-                          style={{
-                            background: '#FEE2E2',
-                            border: '1px solid #F87171',
-                            color: '#991B1B',
-                            fontSize: '12px',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            padding: '2px 8px',
-                            borderRadius: '4px',
-                          }}
-                          title="Cargar un serial que ya existe en la base de datos para probar la alerta"
-                        >
-                          Probar duplicado (BAL-2025-99201-BOG)
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
                             const newSerial = generateNewSerial();
                             handleChange('serial', newSerial);
                             setDuplicateSerialError(null);
@@ -883,12 +802,12 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label id="reg-brand-label" htmlFor="reg-brand" className="microlabel" style={{ display: 'block', color: !isMarcaValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
-                        MARCA {!isMarcaValid && '(CAMPO OBLIGATORIO)'}
+                      <label id="reg-brand-label" htmlFor="reg-brand" className="microlabel" style={{ display: 'block', color: !shown('marca', isMarcaValid) ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
+                        MARCA {!shown('marca', isMarcaValid) && '(CAMPO OBLIGATORIO)'}
                       </label>
                       <input
                         id="reg-brand"
-                        {...fieldA11y('marca', !isMarcaValid, 'reg-brand-label')}
+                        {...fieldA11y('marca', !shown('marca', isMarcaValid), 'reg-brand-label')}
                         type="text"
                         value={formData.marca}
                         onChange={(e) => handleChange('marca', e.target.value)}
@@ -897,20 +816,20 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           width: '100%',
                           padding: '10px 12px',
                           borderRadius: 'var(--radius-input)',
-                          border: !isMarcaValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)',
-                          backgroundColor: !isMarcaValid ? '#FEF2F2' : '#FFFFFF',
+                          border: !shown('marca', isMarcaValid) ? '2px solid var(--danger)' : '1px solid var(--border-strong)',
+                          backgroundColor: !shown('marca', isMarcaValid) ? '#FEF2F2' : '#FFFFFF',
                           fontWeight: 600,
                         }}
                       />
                       {renderFieldError('marca')}
                     </div>
                     <div>
-                      <label id="reg-model-label" htmlFor="reg-model" className="microlabel" style={{ display: 'block', color: !isModeloValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
-                        MODELO {!isModeloValid && '(CAMPO OBLIGATORIO)'}
+                      <label id="reg-model-label" htmlFor="reg-model" className="microlabel" style={{ display: 'block', color: !shown('modelo', isModeloValid) ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
+                        MODELO {!shown('modelo', isModeloValid) && '(CAMPO OBLIGATORIO)'}
                       </label>
                       <input
                         id="reg-model"
-                        {...fieldA11y('modelo', !isModeloValid, 'reg-model-label')}
+                        {...fieldA11y('modelo', !shown('modelo', isModeloValid), 'reg-model-label')}
                         type="text"
                         value={formData.modelo}
                         onChange={(e) => handleChange('modelo', e.target.value)}
@@ -919,8 +838,8 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           width: '100%',
                           padding: '10px 12px',
                           borderRadius: 'var(--radius-input)',
-                          border: !isModeloValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)',
-                          backgroundColor: !isModeloValid ? '#FEF2F2' : '#FFFFFF',
+                          border: !shown('modelo', isModeloValid) ? '2px solid var(--danger)' : '1px solid var(--border-strong)',
+                          backgroundColor: !shown('modelo', isModeloValid) ? '#FEF2F2' : '#FFFFFF',
                           fontWeight: 600,
                         }}
                       />
@@ -930,12 +849,13 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
 
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '12px' }}>
                     <div>
-                      <label htmlFor="reg-max" className="microlabel" style={{ display: 'block', color: !isCapacidadMaxValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
-                        CAPACIDAD MÁXIMA (Max) {!isCapacidadMaxValid && '(> 0)'}
+                      <label htmlFor="reg-max" className="microlabel" style={{ display: 'block', color: !shown('capacidadMax', isCapacidadMaxValid) ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
+                        CAPACIDAD MÁXIMA (Max) {!shown('capacidadMax', isCapacidadMaxValid) && '(> 0)'}
                       </label>
                       <input
                         id="reg-max"
-                        {...fieldA11y('capacidadMaxima', !isCapacidadMaxValid, 'reg-capacity-err')}
+                      placeholder="Ej: 30"
+                        {...fieldA11y('capacidadMaxima', !shown('capacidadMax', isCapacidadMaxValid), 'reg-capacity-err')}
                         type="number"
                         className="font-mono"
                         value={formData.capacidadMax}
@@ -944,20 +864,21 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           width: '100%',
                           padding: '10px 12px',
                           borderRadius: 'var(--radius-input)',
-                          border: !isCapacidadMaxValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)',
-                          backgroundColor: !isCapacidadMaxValid ? '#FEF2F2' : '#FFFFFF',
+                          border: !shown('capacidadMax', isCapacidadMaxValid) ? '2px solid var(--danger)' : '1px solid var(--border-strong)',
+                          backgroundColor: !shown('capacidadMax', isCapacidadMaxValid) ? '#FEF2F2' : '#FFFFFF',
                           fontWeight: 700,
                         }}
                       />
                       {renderFieldError('capacidadMaxima')}
                     </div>
                     <div>
-                      <label htmlFor="reg-min" className="microlabel" style={{ display: 'block', color: !isCapacidadMinValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
-                        CAPACIDAD MÍNIMA (Min) {!isCapacidadMinValid && '(< Max)'}
+                      <label htmlFor="reg-min" className="microlabel" style={{ display: 'block', color: !shown('capacidadMin', isCapacidadMinValid) ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
+                        CAPACIDAD MÍNIMA (Min) {!shown('capacidadMin', isCapacidadMinValid) && '(< Max)'}
                       </label>
                       <input
                         id="reg-min"
-                        {...fieldA11y('capacidadMinima', !isCapacidadMinValid, 'reg-capacity-err')}
+                      placeholder="Ej: 0.1"
+                        {...fieldA11y('capacidadMinima', !shown('capacidadMin', isCapacidadMinValid), 'reg-capacity-err')}
                         type="number"
                         step="0.01"
                         className="font-mono"
@@ -967,8 +888,8 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           width: '100%',
                           padding: '10px 12px',
                           borderRadius: 'var(--radius-input)',
-                          border: !isCapacidadMinValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)',
-                          backgroundColor: !isCapacidadMinValid ? '#FEF2F2' : '#FFFFFF',
+                          border: !shown('capacidadMin', isCapacidadMinValid) ? '2px solid var(--danger)' : '1px solid var(--border-strong)',
+                          backgroundColor: !shown('capacidadMin', isCapacidadMinValid) ? '#FEF2F2' : '#FFFFFF',
                           fontWeight: 700,
                         }}
                       />
@@ -999,12 +920,13 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                       </select>
                     </div>
                     <div>
-                      <label htmlFor="reg-e" className="microlabel" style={{ display: 'block', color: !isDivisionEscalaValid ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
-                        DIVISIÓN ESCALA (e en g) {!isDivisionEscalaValid && '(RECHAZADO)'}
+                      <label htmlFor="reg-e" className="microlabel" style={{ display: 'block', color: !shown('divisionEscala', isDivisionEscalaValid) ? 'var(--danger)' : 'var(--text-muted)', marginBottom: '6px' }}>
+                        DIVISIÓN ESCALA (e en g) {!shown('divisionEscala', isDivisionEscalaValid) && '(RECHAZADO)'}
                       </label>
                       <input
                         id="reg-e"
-                        {...fieldA11y('divisionEscala', !isDivisionEscalaValid, 'reg-ntc-msg')}
+                      placeholder="Ej: 5 (en gramos)"
+                        {...fieldA11y('divisionEscala', !shown('divisionEscala', isDivisionEscalaValid), 'reg-ntc-msg')}
                         type="number"
                         className="font-mono"
                         value={formData.divisionEscala}
@@ -1013,8 +935,8 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           width: '100%',
                           padding: '10px 12px',
                           borderRadius: 'var(--radius-input)',
-                          border: !isDivisionEscalaValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)',
-                          backgroundColor: !isDivisionEscalaValid ? '#FEF2F2' : '#FFFFFF',
+                          border: !shown('divisionEscala', isDivisionEscalaValid) ? '2px solid var(--danger)' : '1px solid var(--border-strong)',
+                          backgroundColor: !shown('divisionEscala', isDivisionEscalaValid) ? '#FEF2F2' : '#FFFFFF',
                           fontWeight: 700,
                         }}
                       />
@@ -1022,6 +944,13 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     </div>
                   </div>
 
+                  {!(touched.capacidadMax || touched.capacidadMin || touched.divisionEscala) && (
+                    <div style={{ fontSize: '12px', color: 'var(--text-muted)', padding: '10px 12px', border: '1px dashed var(--border-strong)', borderRadius: 'var(--radius-card)' }}>
+                      Ingrese la capacidad máxima, la mínima y la división de escala para ver la gráfica y la validación NTC 2031.
+                    </div>
+                  )}
+                  {(touched.capacidadMax || touched.capacidadMin) && (
+                    <>
                   {/* Componente Reactivo de Gráficas y Fórmulas Matemáticas Metrológicas (HU-02) */}
                   <CapacityFormulasChart
                     capacidadMin={minVal}
@@ -1029,9 +958,11 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     unidadMedida={formData.unidadMedida}
                     divisionEscala={eGram}
                   />
+                    </>
+                  )}
 
                   {/* Alerta Roja Visual de Inconsistencia de Capacidades (HU-02) */}
-                  {!isCapacityConsistent && (
+                  {!isCapacityConsistent && (touched.capacidadMax || touched.capacidadMin) && (
                     <div
                       id="reg-capacity-err"
                       role="alert"
@@ -1053,6 +984,8 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     </div>
                   )}
 
+                  {(touched.capacidadMax || touched.capacidadMin || touched.divisionEscala) && (
+                    <>
                   {/* Motor de Validación Metrológica NTC 2031 */}
                   <div
                     id="reg-ntc-msg"
@@ -1076,10 +1009,12 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     <div style={{ marginTop: '4px', fontWeight: 600 }}>
                       {ntcValidation.message}
                     </div>
-                    <div style={{ fontSize: '12px', marginTop: '2px', opacity: 0.85 }}>
+                    <div style={{ fontSize: '12px', marginTop: '2px' }}>
                       Escalones de verificación calculados: n = Max / e = ({maxInGrams.toLocaleString()} g / {eGram} g) = <strong>{nDivisions.toLocaleString()} escalones</strong>.
                     </div>
                   </div>
+                    </>
+                  )}
 
                   {/* Evidencias Fotográficas Obligatorias con Preview Visual y Compresión Automática (HU-01) */}
                   <div style={{ marginTop: '8px' }}>
@@ -1094,9 +1029,9 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
 
                     <div role="group" aria-labelledby="reg-evidencias-title" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                       {/* Foto 1: Equipo */}
-                      <div style={{ border: !isFotoEquipoValid ? '2px dashed var(--danger)' : '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: '10px', backgroundColor: !isFotoEquipoValid ? '#FEF2F2' : '#F8FAFC' }}>
-                        <label id="reg-foto-eq-label" htmlFor="reg-foto-eq" style={{ fontSize: '12px', fontWeight: 700, color: !isFotoEquipoValid ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
-                          1. Foto Instrumento Completo {!isFotoEquipoValid && '(OBLIGATORIA)'}
+                      <div style={{ border: !shown('fotoEquipo', isFotoEquipoValid) ? '2px dashed var(--danger)' : '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: '10px', backgroundColor: !shown('fotoEquipo', isFotoEquipoValid) ? '#FEF2F2' : '#F8FAFC' }}>
+                        <label id="reg-foto-eq-label" htmlFor="reg-foto-eq" style={{ fontSize: '12px', fontWeight: 700, color: !shown('fotoEquipo', isFotoEquipoValid) ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
+                          1. Foto Instrumento Completo {!shown('fotoEquipo', isFotoEquipoValid) && '(OBLIGATORIA)'}
                         </label>
                         <div style={{ marginBottom: '6px' }}>
                           <label
@@ -1125,12 +1060,12 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                         </div>
                         <input
                           id="reg-foto-eq"
-                        {...fieldA11y('fotoEquipo', !isFotoEquipoValid, 'reg-foto-eq-label')}
+                        {...fieldA11y('fotoEquipo', !shown('fotoEquipo', isFotoEquipoValid), 'reg-foto-eq-label')}
                           type="text"
                           value={formData.fotoEquipo.startsWith('data:') ? '[Foto Comprimida en Base64]' : formData.fotoEquipo}
                           onChange={(e) => handleChange('fotoEquipo', e.target.value)}
                           placeholder="O ingrese URL directa"
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: 'var(--radius-input)', border: !isFotoEquipoValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: 'var(--radius-input)', border: !shown('fotoEquipo', isFotoEquipoValid) ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
                         />
                       {renderFieldError('fotoEquipo')}
                         <div style={{ height: '80px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1148,9 +1083,9 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                       </div>
 
                       {/* Foto 2: Precinto */}
-                      <div style={{ border: !isFotoPrecintoValid ? '2px dashed var(--danger)' : '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: '10px', backgroundColor: !isFotoPrecintoValid ? '#FEF2F2' : '#F8FAFC' }}>
-                        <label id="reg-foto-prec-label" htmlFor="reg-foto-prec" style={{ fontSize: '12px', fontWeight: 700, color: !isFotoPrecintoValid ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
-                          2. Foto Precinto SIMEL {!isFotoPrecintoValid && '(OBLIGATORIA)'}
+                      <div style={{ border: !shown('fotoPrecinto', isFotoPrecintoValid) ? '2px dashed var(--danger)' : '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: '10px', backgroundColor: !shown('fotoPrecinto', isFotoPrecintoValid) ? '#FEF2F2' : '#F8FAFC' }}>
+                        <label id="reg-foto-prec-label" htmlFor="reg-foto-prec" style={{ fontSize: '12px', fontWeight: 700, color: !shown('fotoPrecinto', isFotoPrecintoValid) ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
+                          2. Foto Precinto SIMEL {!shown('fotoPrecinto', isFotoPrecintoValid) && '(OBLIGATORIA)'}
                         </label>
                         <div style={{ marginBottom: '6px' }}>
                           <label
@@ -1179,12 +1114,12 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                         </div>
                         <input
                           id="reg-foto-prec"
-                        {...fieldA11y('fotoPrecinto', !isFotoPrecintoValid, 'reg-foto-prec-label')}
+                        {...fieldA11y('fotoPrecinto', !shown('fotoPrecinto', isFotoPrecintoValid), 'reg-foto-prec-label')}
                           type="text"
                           value={formData.fotoPrecinto.startsWith('data:') ? '[Foto Comprimida en Base64]' : formData.fotoPrecinto}
                           onChange={(e) => handleChange('fotoPrecinto', e.target.value)}
                           placeholder="O ingrese URL directa"
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: 'var(--radius-input)', border: !isFotoPrecintoValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: 'var(--radius-input)', border: !shown('fotoPrecinto', isFotoPrecintoValid) ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
                         />
                       {renderFieldError('fotoPrecinto')}
                         <div style={{ height: '80px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1202,9 +1137,9 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                       </div>
 
                       {/* Foto 3: Ubicación */}
-                      <div style={{ border: !isFotoUbicacionValid ? '2px dashed var(--danger)' : '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: '10px', backgroundColor: !isFotoUbicacionValid ? '#FEF2F2' : '#F8FAFC' }}>
-                        <label id="reg-foto-ub-label" htmlFor="reg-foto-ub" style={{ fontSize: '12px', fontWeight: 700, color: !isFotoUbicacionValid ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
-                          3. Foto Ubicación en Local {!isFotoUbicacionValid && '(OBLIGATORIA)'}
+                      <div style={{ border: !shown('fotoUbicacion', isFotoUbicacionValid) ? '2px dashed var(--danger)' : '1px solid var(--border)', borderRadius: 'var(--radius-card)', padding: '10px', backgroundColor: !shown('fotoUbicacion', isFotoUbicacionValid) ? '#FEF2F2' : '#F8FAFC' }}>
+                        <label id="reg-foto-ub-label" htmlFor="reg-foto-ub" style={{ fontSize: '12px', fontWeight: 700, color: !shown('fotoUbicacion', isFotoUbicacionValid) ? 'var(--danger)' : 'var(--navy-900)', display: 'block', marginBottom: '4px' }}>
+                          3. Foto Ubicación en Local {!shown('fotoUbicacion', isFotoUbicacionValid) && '(OBLIGATORIA)'}
                         </label>
                         <div style={{ marginBottom: '6px' }}>
                           <label
@@ -1233,12 +1168,12 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                         </div>
                         <input
                           id="reg-foto-ub"
-                        {...fieldA11y('fotoUbicacion', !isFotoUbicacionValid, 'reg-foto-ub-label')}
+                        {...fieldA11y('fotoUbicacion', !shown('fotoUbicacion', isFotoUbicacionValid), 'reg-foto-ub-label')}
                           type="text"
                           value={formData.fotoUbicacion.startsWith('data:') ? '[Foto Comprimida en Base64]' : formData.fotoUbicacion}
                           onChange={(e) => handleChange('fotoUbicacion', e.target.value)}
                           placeholder="O ingrese URL directa"
-                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: 'var(--radius-input)', border: !isFotoUbicacionValid ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
+                          style={{ width: '100%', padding: '5px 8px', fontSize: '12px', borderRadius: 'var(--radius-input)', border: !shown('fotoUbicacion', isFotoUbicacionValid) ? '2px solid var(--danger)' : '1px solid var(--border-strong)', marginBottom: '6px' }}
                         />
                       {renderFieldError('fotoUbicacion')}
                         <div style={{ height: '80px', borderRadius: '4px', overflow: 'hidden', backgroundColor: '#E2E8F0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -1295,6 +1230,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     </label>
                     <input
                       id="reg-establishment"
+                      placeholder="Ej: Distribuidora de Alimentos del Centro S.A.S."
                       type="text"
                       value={formData.establecimiento}
                       onChange={(e) => handleChange('establecimiento', e.target.value)}
@@ -1308,6 +1244,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     </label>
                     <input
                       id="reg-nit"
+                      placeholder="Ej: 901.442.190-3"
                       type="text"
                       className="font-mono"
                       value={formData.nit}
@@ -1323,6 +1260,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                       </label>
                       <input
                         id="reg-dep"
+                      placeholder="Ej: Cundinamarca"
                         type="text"
                         value={formData.departamento}
                         onChange={(e) => handleChange('departamento', e.target.value)}
@@ -1335,6 +1273,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                       </label>
                       <input
                         id="reg-mun"
+                      placeholder="Ej: Bogotá D.C."
                         type="text"
                         value={formData.municipio}
                         onChange={(e) => handleChange('municipio', e.target.value)}
@@ -1349,6 +1288,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     </label>
                     <input
                       id="reg-address"
+                      placeholder="Ej: Carrera 13 # 65-22 Local 102"
                       type="text"
                       value={formData.direccion}
                       onChange={(e) => handleChange('direccion', e.target.value)}
@@ -1389,6 +1329,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     </label>
                     <input
                       id="reg-stamp"
+                      placeholder="Ej: STAMP-CO-9982415"
                         {...fieldA11y('codigoPrecintoSIMEL', Boolean(duplicatePrecintoError), 'reg-stamp-dup')}
                       type="text"
                       className="font-mono"
@@ -1434,6 +1375,7 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                     </label>
                     <input
                       id="reg-oec"
+                      placeholder="Ej: ONAC-18-LAB-042"
                       type="text"
                       className="font-mono"
                       value={formData.oecAcreditado}
@@ -1492,19 +1434,6 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                       <AlertTriangleIcon size={16} />
                       <span>{errorMsg}</span>
                     </div>
-                    {errorMsg.toLowerCase().includes('autoriz') || errorMsg.toLowerCase().includes('unauthorized') || !canRegister ? (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
-                        <button
-                          type="button"
-                          className="btn-gov-primary"
-                          onClick={() => handleQuickLogin('tecnico')}
-                          style={{ height: '30px', fontSize: '12px', padding: '0 10px' }}
-                        >
-                          <UserCheckIcon size={12} />
-                          <span>Iniciar Sesión como Técnico y Reintentar</span>
-                        </button>
-                      </div>
-                    ) : null}
                   </div>
                 )}
 
@@ -1555,6 +1484,19 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                         return;
                       }
 
+                      if (!formData.fechaUltimaCalibracion || !formData.fechaProximaCalibracion) {
+                        const m = 'Indique la fecha de la última calibración y la de la próxima calibración.';
+                        setErrorMsg(m);
+                        toast.error(m);
+                        return;
+                      }
+                      if (formData.fechaProximaCalibracion <= formData.fechaUltimaCalibracion) {
+                        const m = 'La fecha de próxima calibración debe ser posterior a la de la última calibración.';
+                        setErrorMsg(m);
+                        toast.error(m);
+                        return;
+                      }
+
                       // Validación preventiva de duplicidad en precinto
                       const precintoErr = validatePrecintoUniqueness(formData.precintoSIMEL);
                       if (precintoErr) {
@@ -1566,9 +1508,9 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
 
                       setSubmitting(true);
                       try {
-                        // Si no está autenticado, intentamos loguear automáticamente como técnico para fluidez de la demo
+                        // Nunca se inicia sesion en silencio: sin un rol autorizado no se envia nada.
                         if (!canRegister) {
-                          await handleQuickLogin('tecnico');
+                          throw new Error('Acceso no autorizado: inicie sesión como Técnico o Administrador para radicar instrumentos.');
                         }
 
                         const tipoMapeado = formData.tipo.includes('Pesa')
@@ -1594,9 +1536,9 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                           divisionEscala: divisionEscalaNormalizada,
                           codigoPrecintoSIMEL: formData.precintoSIMEL.trim().toUpperCase(),
                           evidenciasFotograficas: {
-                            fotoEquipo: formData.fotoEquipo || 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?w=800',
-                            fotoPrecinto: formData.fotoPrecinto || 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=800',
-                            fotoUbicacion: formData.fotoUbicacion || 'https://images.unsplash.com/photo-1581092580497-e0d23cbdf1dc?w=800',
+                            fotoEquipo: formData.fotoEquipo,
+                            fotoPrecinto: formData.fotoPrecinto,
+                            fotoUbicacion: formData.fotoUbicacion,
                           },
                           propietario: {
                             nombreRazonSocial: formData.establecimiento.trim(),
@@ -1641,58 +1583,11 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                             return;
                           }
 
-                          // Si hay error de red o backend offline en demo
-                          if (
-                            message.includes('red') ||
-                            message.includes('Failed to fetch') ||
-                            message.includes('Network') ||
-                            status === 0
-                          ) {
-                            // Validar contra instrumentos locales
-                            if (
-                              existingInstruments.some(
-                                (inst) => inst.serial.trim().toUpperCase() === payload.serial,
-                              )
-                            ) {
-                              const duplicateMsg = `⚠️ Ya existe un instrumento registrado con el serial '${payload.serial}'.`;
-                              setDuplicateSerialError(duplicateMsg);
-                              setErrorMsg(duplicateMsg);
-                              toast.error(`⚠️ ALERTA DE DUPLICIDAD: ${duplicateMsg}`, {
-                                duration: 8000,
-                              });
-                              setCurrentStep(1);
-                              return;
-                            }
-
-                            // Crear instrumento localmente para fallback
-                            registeredResult = {
-                              id: `mock-${Date.now()}`,
-                              serial: payload.serial,
-                              placaRump: `RUMP-CO-${Math.floor(100000 + Math.random() * 900000)}`,
-                              establecimiento: payload.propietario?.nombreRazonSocial || '',
-                              nit: payload.propietario?.nitRut || '',
-                              departamento: payload.propietario?.departamento || 'Cundinamarca',
-                              municipio: payload.propietario?.ciudad || 'Bogotá D.C.',
-                              tipoInstrumento: `${payload.tipo} Clase III (${payload.marca} ${payload.modelo})`,
-                              marca: payload.marca,
-                              modelo: payload.modelo,
-                              capacidadMax: `${payload.capacidadMaxima} kg`,
-                              divisionEscala: `e = ${formData.divisionEscala} g`,
-                              irregularidad: 'Conforme metrológicamente (NTC 2031)',
-                              deteccionSistema: 'Inscripción RUMP In-Situ',
-                              timestampDeteccion: new Date().toLocaleString(),
-                              estado: 'VIGENTE (APTO)',
-                              precintoSIMEL: payload.codigoPrecintoSIMEL || '',
-                              oecAcreditado: formData.oecAcreditado,
-                              hsmKey: 'HSM-KEY #9842',
-                              versionFirmware: '4.12.8-STABLE',
-                              accionRecomendada: 'Emisión de Certificado Digital RUMP',
-                              latitud: 4.6097,
-                              longitud: -74.0817,
-                            };
-                          } else {
-                            throw apiErr;
+                          // Sin conexion o error del servidor: NO se simula el registro. Se informa el fallo.
+                          if (status === 0) {
+                            throw new Error('Sin conexión con el servidor: el instrumento NO fue registrado. Verifique la red e intente de nuevo.');
                           }
+                          throw apiErr;
                         }
 
                         confetti({
@@ -1780,7 +1675,11 @@ export const RegisterInstrumentView: React.FC<RegisterInstrumentViewProps> = ({
                 <div className="microlabel" style={{ color: 'var(--navy-900)' }}>
                   FICHA DE PRE-VALIDACIÓN REGULATORIA
                 </div>
-                <span className="status-pill ok">PRE-APROBADO</span>
+                {isStep1Valid ? (
+                  <span className="status-pill ok">PRE-APROBADO</span>
+                ) : (
+                  <span className="status-pill info">PENDIENTE DE DATOS</span>
+                )}
               </div>
 
               {/* Rótulo Metrológico Oficial SICM-COL con QR */}

@@ -7,6 +7,8 @@ interface ForensicFiltersProps {
   onFilterChange: (field: keyof FilterCriteria, value: string) => void;
   onReset: () => void;
   onApply: () => void;
+  /** Zonas con equipos registrados (se calculan con los datos reales). */
+  zones?: Array<{ clave: string; nombre: string }>;
 }
 
 export const ForensicFilters: React.FC<ForensicFiltersProps> = ({
@@ -14,6 +16,7 @@ export const ForensicFilters: React.FC<ForensicFiltersProps> = ({
   onFilterChange,
   onReset,
   onApply,
+  zones = [],
 }) => {
   return (
     <section
@@ -212,7 +215,7 @@ export const ForensicFilters: React.FC<ForensicFiltersProps> = ({
                 className="microlabel"
                 style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}
               >
-                JURISDICCIÓN / NODO REGIONAL
+                JURISDICCIÓN / ZONA
               </label>
               <select
                 id="filter-jurisdiction"
@@ -228,12 +231,12 @@ export const ForensicFilters: React.FC<ForensicFiltersProps> = ({
                   color: 'var(--text-primary)',
                 }}
               >
-                <option value="">TODOS LOS NODOS REGIONALES</option>
-                <option value="Bogotá D.C.">NODO BOG-01 · BOGOTÁ D.C. & CUNDINAMARCA</option>
-                <option value="Medellín">NODO MED-02 · ANTIOQUIA & EJE CAFETERO</option>
-                <option value="Cali">NODO CAL-03 · VALLE DEL CAUCA & PACÍFICO</option>
-                <option value="Barranquilla">NODO BAR-04 · REGIÓN CARIBE</option>
-                <option value="Bucaramanga">NODO BUC-05 · SANTANDERES & ORIENTE</option>
+                <option value="">TODAS LAS ZONAS</option>
+                {zones.map((z) => (
+                  <option key={z.clave} value={z.clave}>
+                    {z.nombre.toUpperCase()}
+                  </option>
+                ))}
               </select>
             </div>
 

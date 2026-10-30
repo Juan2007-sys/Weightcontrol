@@ -44,6 +44,19 @@ export class EvidenciasFotograficas {
   fotoUbicacion: string;
 }
 
+export type TipoEvidencia = 'fotoEquipo' | 'fotoPrecinto' | 'fotoUbicacion';
+export const TIPOS_EVIDENCIA: TipoEvidencia[] = ['fotoEquipo', 'fotoPrecinto', 'fotoUbicacion'];
+
+/** HU-09: quien y cuando cargo cada fotografia. */
+@Schema({ _id: false })
+export class EvidenciaMeta {
+  @Prop({ type: Date })
+  fechaCarga?: Date;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Usuario' })
+  cargadoPor?: Usuario | string;
+}
+
 @Schema({ _id: false })
 export class PropietarioInfo {
   @Prop({ required: true, trim: true })
@@ -117,6 +130,10 @@ export class Instrumento {
   @Prop({ type: EvidenciasFotograficas, required: true })
   evidenciasFotograficas: EvidenciasFotograficas;
 
+  /** HU-09: trazabilidad de carga por tipo de evidencia. */
+  @Prop({ type: MongooseSchema.Types.Mixed })
+  evidenciasMeta?: Partial<Record<TipoEvidencia, { fechaCarga?: Date; cargadoPor?: Usuario | string }>>;
+
   @Prop({ trim: true })
   ubicacionFisica?: string;
 
@@ -141,6 +158,19 @@ export class Instrumento {
    */
   @Prop({ type: String, enum: ['NO_CONFORME'], required: false })
   motivoVencimiento?: 'NO_CONFORME';
+
+  /** HU-08: un equipo inactivo no puede usarse en nuevas calibraciones; su historial se conserva. */
+  @Prop({ type: Boolean, default: true, index: true })
+  activo: boolean;
+
+  @Prop({ type: Date })
+  fechaInactivacion?: Date;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Usuario' })
+  inactivadoPor?: Usuario | string;
+
+  @Prop({ trim: true })
+  motivoInactivacion?: string;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Usuario' })
   creadoPor?: Usuario | string;

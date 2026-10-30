@@ -1,104 +1,155 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { MetrologicalInstrument } from '../../types/metrology';
-import { BalanceIcon, SearchIcon, EyeIcon, TrashIcon } from '../common/Icons';
+import { BalanceIcon, SearchIcon, EyeIcon, EditIcon, RotateCcwIcon } from '../common/Icons';
 import { InspectionDetailModal } from '../audit/InspectionDetailModal';
+import { EquipmentHistoryModal } from './EquipmentHistoryModal';
+import { EditInstrumentModal } from './EditInstrumentModal';
+import { EvidenceManagerModal } from './EvidenceManagerModal';
+import { ToggleActiveModal } from './ToggleActiveModal';
 import { useAuth } from '../../context/AuthContext';
 import { instrumentosService } from '../../services/instrumentos.service';
-import { toast } from 'sonner';
+import { mapBackendInstrumentToFrontend } from '../../services/mappers';
+import type { BackendInstrumento } from '../../services/mappers';
+import { formatCalendarDate, formatDateTime } from '../../utils/dates';
 
 interface InstrumentsListViewProps {
-  instruments: MetrologicalInstrument[];
-  onNewInstrument: () => void;
+  /** Se conserva por compatibilidad con App; la lista consulta al servidor con los filtros aplicados. */
+  instruments?: MetrologicalInstrument[];
+  /** Sin valor, el rol no puede registrar y el boton no se muestra. */
+  onNewInstrument?: () => void;
   onRefresh?: () => void;
   onDeleteInstrument?: (id: string) => void;
 }
 
-export const InstrumentsListView: React.FC<InstrumentsListViewProps> = ({
-  instruments,
-  onNewInstrument,
-  onRefresh,
-  onDeleteInstrument,
-}) => {
-  const { user, isAuthenticated, login } = useAuth();
-  const [filterState, setFilterState] = useState<string>('todos');
-  const [search, setSearch] = useState<string>('');
-  const [selectedInstrument, setSelectedInstrument] = useState<MetrologicalInstrument | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
+interface Filters {
+  search: string;
+  marca: string;
+  tipo: string;
+  categoriaExactitud: string;
+  estado: string;
+  unidadMedida: string;
+  capacidadDesde: string;
+  capacidadHasta: string;
+  registroDesde: string;
+  registroHasta: string;
+  activo: '' | 'true' | 'false';
+}
 
-  const handleDelete = async (item: MetrologicalInstrument) => {
-    const confirmDelete = window.confirm(
-      `¿Está seguro de revocar/eliminar el instrumento con serial ${item.serial}?\n\nEsta acción generará una pista de auditoría inmutable en el backend bajo ISO/IEC 27001.`
-    );
-    if (!confirmDelete) return;
+const EMPTY: Filters = {
+  search: '',
+  marca: '',
+  tipo: '',
+  categoriaExactitud: '',
+  estado: '',
+  unidadMedida: '',
+  capacidadDesde: '',
+  capacidadHasta: '',
+  registroDesde: '',
+  registroHasta: '',
+  activo: '',
+};
 
-    setDeletingId(item.id);
+const PAGE_SIZE = 25;
+
+const field: React.CSSProperties = { display: 'grid', gap: '3px', fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)' };
+const control: React.CSSProperties = {
+  padding: '6px 8px',
+  border: '1px solid var(--border-strong)',
+  borderRadius: 'var(--radius-input)',
+  fontSize: '12px',
+  fontWeight: 400,
+  color: 'var(--text-primary)',
+  backgroundColor: '#FFFFFF',
+};
+const th: React.CSSProperties = { padding: '12px 14px', color: '#FFFFFF' };
+const td: React.CSSProperties = { padding: '11px 14px', verticalAlign: 'middle' };
+
+const pillClass = (estado: string) =>
+  estado === 'Vigente' ? 'ok' : estado === 'Por vencer' ? 'warn' : 'danger';
+
+const buildParams = (f: Filters, page: number) => {
+  const p: Record<string, any> = { page, limit: PAGE_SIZE };
+  (['search', 'marca', 'tipo', 'categoriaExactitud', 'estado', 'unidadMedida', 'registroDesde', 'registroHasta', 'activo'] as const).forEach(
+    (k) => {
+      if (f[k]) p[k] = f[k];
+    },
+  );
+  if (f.capacidadDesde !== '') p.capacidadDesde = Number(f.capacidadDesde);
+  if (f.capacidadHasta !== '') p.capacidadHasta = Number(f.capacidadHasta);
+  return p;
+};
+
+export const InstrumentsListView: React.FC<InstrumentsListViewProps> = ({ onNewInstrument, onRefresh }) => {
+  const { user } = useAuth();
+  const isAdmin = user?.rol === 'ADMIN';
+  const canEdit = user?.rol === 'ADMIN' || user?.rol === 'TECNICO';
+
+  const [draft, setDraft] = useState<Filters>(EMPTY);
+  const [applied, setApplied] = useState<Filters>(EMPTY);
+  const [page, setPage] = useState(1);
+  const [rows, setRows] = useState<BackendInstrumento[]>([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const [ficha, setFicha] = useState<MetrologicalInstrument | null>(null);
+  const [historial, setHistorial] = useState<BackendInstrumento | null>(null);
+  const [editando, setEditando] = useState<BackendInstrumento | null>(null);
+  const [evidencias, setEvidencias] = useState<BackendInstrumento | null>(null);
+  const [toggle, setToggle] = useState<BackendInstrumento | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
     try {
-      // Si no es admin o no está logueado en demo, aseguramos sesión admin si es necesario
-      if (!isAuthenticated || user?.rol !== 'ADMIN') {
-        try {
-          await login('admin@weightcontrol.gov.co', 'Admin123456!');
-        } catch {
-          // Continuar con intento normal
-        }
-      }
-
-      await instrumentosService.delete(item.id);
-      toast.success(`Instrumento ${item.serial} eliminado del censo nacional.`);
-      if (onDeleteInstrument) {
-        onDeleteInstrument(item.id);
-      }
-      if (onRefresh) {
-        onRefresh();
-      }
-    } catch (err: any) {
-      const msg = err?.message || 'Error al eliminar instrumento';
-      if (msg.includes('401') || msg.includes('403') || msg.includes('Unauthorized')) {
-        toast.error('Permiso denegado: Solo el Administrador Central SIC puede eliminar registros.');
-      } else {
-        // En fallback de UI para mock data
-        if (onDeleteInstrument) {
-          onDeleteInstrument(item.id);
-        }
-        toast.info(`Instrumento ${item.serial} removido de la vista local.`);
-      }
+      const res = await instrumentosService.getAll(buildParams(applied, page));
+      setRows(res.raw);
+      setTotal(res.total);
+      setError(null);
+    } catch (e: any) {
+      setError(e?.message || 'No fue posible consultar los instrumentos.');
+      setRows([]);
+      setTotal(0);
     } finally {
-      setDeletingId(null);
+      setLoading(false);
     }
+  }, [applied, page]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const refreshAll = () => {
+    load();
+    onRefresh?.();
   };
 
-  const filtered = instruments.filter((item) => {
-    const matchesSearch =
-      item.serial.toLowerCase().includes(search.toLowerCase()) ||
-      item.establecimiento.toLowerCase().includes(search.toLowerCase()) ||
-      item.nit.includes(search);
+  const setField = (k: keyof Filters) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setDraft((d) => ({ ...d, [k]: e.target.value }));
 
-    if (filterState === 'todos') return matchesSearch;
-    if (filterState === 'vigente') return matchesSearch && item.estado === 'VIGENTE (APTO)';
-    if (filterState === 'por_vencer') return matchesSearch && item.estado === 'POR VENCER (<30 DÍAS)';
-    if (filterState === 'vencido') return matchesSearch && (item.estado === 'VENCIDO / NO APTO' || item.estado === 'CRÍTICA (MEDIDA INMEDIATA)');
-    return matchesSearch;
-  });
+  const apply = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    setApplied(draft);
+  };
+
+  const clear = () => {
+    setDraft(EMPTY);
+    setApplied(EMPTY);
+    setPage(1);
+  };
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const activeFilterCount = useMemo(() => Object.values(applied).filter((v) => v !== '').length, [applied]);
+  const idOf = (r: BackendInstrumento) => r.id || r._id || r.serial;
+  const unidad = (r: BackendInstrumento) => r.unidadMedida || 'kg';
 
   return (
     <div style={{ paddingBottom: '32px' }}>
       <div className="gov-container">
-        {/* Encabezado con Botón de Registrar Nuevo */}
         <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'flex-start',
-            gap: '24px',
-            marginBottom: '24px',
-            flexWrap: 'wrap',
-          }}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '24px', marginBottom: '24px', flexWrap: 'wrap' }}
         >
-          <div
-            style={{
-              borderLeft: '4px solid var(--navy-900)',
-              paddingLeft: '18px',
-            }}
-          >
+          <div style={{ borderLeft: '4px solid var(--navy-900)', paddingLeft: '18px' }}>
             <div className="microlabel" style={{ color: 'var(--text-muted)' }}>
               MÓDULO TÉCNICO · CENSO DE EQUIPOS BAJO CUSTODIA (RUMP)
             </div>
@@ -115,170 +166,268 @@ export const InstrumentsListView: React.FC<InstrumentsListViewProps> = ({
               Mis Instrumentos Registrados
             </h1>
             <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '4px' }}>
-              Gestión metrológica, historial de calibraciones y precintos SIMEL del parque de instrumentos inscritos.
+              Consulta, filtros, historial, edición, inactivación y evidencias fotográficas de los equipos inscritos.
             </p>
           </div>
-
-          <button
-            type="button"
-            className="btn-gov-primary"
-            onClick={onNewInstrument}
-          >
-            <BalanceIcon size={16} />
-            <span>Registrar Nuevo Instrumento</span>
-          </button>
+          {onNewInstrument && (
+            <button type="button" className="btn-gov-primary" onClick={onNewInstrument}>
+              <BalanceIcon size={16} />
+              <span>Registrar Nuevo Instrumento</span>
+            </button>
+          )}
         </div>
 
-        {/* Barra de Filtros Rápidos */}
-        <div
+        {/* HU-10: filtros de equipos */}
+        <form
+          onSubmit={apply}
           className="gov-card"
-          style={{
-            padding: '16px 20px',
-            marginBottom: '20px',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            flexWrap: 'wrap',
-            gap: '12px',
-          }}
+          aria-label="Filtros de equipos"
+          data-testid="filtros-equipos"
+          style={{ padding: '16px 20px', marginBottom: '20px' }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <button
-              type="button"
-              onClick={() => setFilterState('todos')}
-              className={`btn-gov-compact ${filterState === 'todos' ? 'btn-gov-primary' : ''}`}
-            >
-              Todos ({instruments.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterState('vigente')}
-              className={`btn-gov-compact ${filterState === 'vigente' ? 'btn-gov-primary' : ''}`}
-            >
-              Vigentes Apto
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterState('por_vencer')}
-              className={`btn-gov-compact ${filterState === 'por_vencer' ? 'btn-gov-primary' : ''}`}
-            >
-              Por Vencer (&lt;30d)
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterState('vencido')}
-              className={`btn-gov-compact ${filterState === 'vencido' ? 'btn-gov-primary' : ''}`}
-            >
-              Vencidos / Medidas
-            </button>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: '12px' }}>
+            <label style={field}>
+              Número de serie / búsqueda
+              <span style={{ position: 'relative', display: 'block' }}>
+                <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)', display: 'flex' }}>
+                  <SearchIcon size={13} />
+                </span>
+                <input
+                  style={{ ...control, paddingLeft: 28, width: '100%' }}
+                  value={draft.search}
+                  onChange={setField('search')}
+                  placeholder="Serial, titular, NIT…"
+                />
+              </span>
+            </label>
+            <label style={field}>
+              Marca
+              <input style={control} value={draft.marca} onChange={setField('marca')} placeholder="Ej. Torrey" />
+            </label>
+            <label style={field}>
+              Tipo de equipo
+              <select style={control} value={draft.tipo} onChange={setField('tipo')}>
+                <option value="">Todos</option>
+                <option value="Bascula">Báscula</option>
+                <option value="Pesa">Pesa</option>
+                <option value="Dinamometro">Dinamómetro</option>
+              </select>
+            </label>
+            <label style={field}>
+              Clase de exactitud
+              <select style={control} value={draft.categoriaExactitud} onChange={setField('categoriaExactitud')}>
+                <option value="">Todas</option>
+                <option>Clase I</option>
+                <option>Clase II</option>
+                <option>Clase III</option>
+                <option>Clase IIII</option>
+              </select>
+            </label>
+            <label style={field}>
+              Estado metrológico
+              <select style={control} value={draft.estado} onChange={setField('estado')}>
+                <option value="">Todos</option>
+                <option value="Vigente">Vigente</option>
+                <option value="Por vencer">Por vencer</option>
+                <option value="Vencido">Vencido</option>
+              </select>
+            </label>
+            <label style={field}>
+              Estado operativo
+              <select style={control} value={draft.activo} onChange={setField('activo')}>
+                <option value="">Activos e inactivos</option>
+                <option value="true">Solo activos</option>
+                <option value="false">Solo inactivos</option>
+              </select>
+            </label>
+            <label style={field}>
+              Unidad de medida
+              <select style={control} value={draft.unidadMedida} onChange={setField('unidadMedida')}>
+                <option value="">Todas</option>
+                {['g', 'kg', 't', 'lb', 'N', 'kN'].map((u) => (
+                  <option key={u}>{u}</option>
+                ))}
+              </select>
+            </label>
+            <label style={field}>
+              Capacidad máxima desde
+              <input style={control} type="number" min="0" step="any" value={draft.capacidadDesde} onChange={setField('capacidadDesde')} />
+            </label>
+            <label style={field}>
+              Capacidad máxima hasta
+              <input style={control} type="number" min="0" step="any" value={draft.capacidadHasta} onChange={setField('capacidadHasta')} />
+            </label>
+            <label style={field}>
+              Registrado desde
+              <input style={control} type="date" value={draft.registroDesde} onChange={setField('registroDesde')} />
+            </label>
+            <label style={field}>
+              Registrado hasta
+              <input style={control} type="date" value={draft.registroHasta} onChange={setField('registroHasta')} />
+            </label>
           </div>
-
-          <div style={{ position: 'relative', width: '280px' }}>
-            <div
-              style={{
-                position: 'absolute',
-                left: '10px',
-                top: '50%',
-                transform: 'translateY(-50%)',
-                color: 'var(--text-muted)',
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              <SearchIcon size={14} />
-            </div>
-            <input
-              type="text"
-              placeholder="Buscar por serial, NIT o titular..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '6px 10px 6px 30px',
-                borderRadius: 'var(--radius-input)',
-                border: '1px solid var(--border-strong)',
-                fontSize: '12px',
-              }}
-            />
+          <div style={{ display: 'flex', gap: '8px', marginTop: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <button type="submit" className="btn-gov-primary">
+              <SearchIcon size={13} />
+              <span>Aplicar filtros</span>
+            </button>
+            <button type="button" className="btn-gov-compact" onClick={clear}>
+              <RotateCcwIcon size={12} />
+              <span>Limpiar</span>
+            </button>
+            <span role="status" style={{ fontSize: '12px', color: 'var(--text-muted)' }} data-testid="resultado-conteo">
+              {loading ? 'Consultando…' : `${total} equipo${total === 1 ? '' : 's'} encontrado${total === 1 ? '' : 's'}`}
+              {activeFilterCount > 0 && ` · ${activeFilterCount} filtro${activeFilterCount === 1 ? '' : 's'} activo${activeFilterCount === 1 ? '' : 's'}`}
+            </span>
           </div>
-        </div>
+        </form>
 
-        {/* Tabla Simplificada de Instrumentos */}
-        <div
-          className="gov-card"
-          style={{
-            overflowX: 'auto',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-card)',
-          }}
-        >
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+        {error && (
+          <div role="alert" className="status-pill danger" style={{ display: 'block', marginBottom: '12px' }}>
+            {error}
+          </div>
+        )}
+
+        <div className="gov-card" style={{ overflowX: 'auto', border: '1px solid var(--border)', borderRadius: 'var(--radius-card)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }} data-testid="tabla-equipos">
             <thead style={{ backgroundColor: 'var(--navy-900)', color: '#FFFFFF' }}>
               <tr>
-                <th scope="col" className="microlabel" style={{ padding: '12px 16px', color: '#FFFFFF' }}>SERIAL / PLACA</th>
-                <th scope="col" className="microlabel" style={{ padding: '12px 16px', color: '#FFFFFF' }}>ESTABLECIMIENTO</th>
-                <th scope="col" className="microlabel" style={{ padding: '12px 16px', color: '#FFFFFF' }}>ESPECIFICACIONES</th>
-                <th scope="col" className="microlabel" style={{ padding: '12px 16px', color: '#FFFFFF' }}>PRECINTO SIMEL</th>
-                <th scope="col" className="microlabel" style={{ padding: '12px 16px', color: '#FFFFFF', textAlign: 'center' }}>ESTADO</th>
-                <th scope="col" className="microlabel" style={{ padding: '12px 16px', color: '#FFFFFF', textAlign: 'right' }}>ACCIONES</th>
+                <th scope="col" className="microlabel" style={th}>SERIAL</th>
+                <th scope="col" className="microlabel" style={th}>MARCA</th>
+                <th scope="col" className="microlabel" style={th}>TIPO</th>
+                <th scope="col" className="microlabel" style={{ ...th, textAlign: 'right' }}>CAP. MÍNIMA</th>
+                <th scope="col" className="microlabel" style={{ ...th, textAlign: 'right' }}>CAP. MÁXIMA</th>
+                <th scope="col" className="microlabel" style={{ ...th, textAlign: 'center' }}>ESTADO</th>
+                <th scope="col" className="microlabel" style={th}>FECHA DE REGISTRO</th>
+                <th scope="col" className="microlabel" style={{ ...th, textAlign: 'right' }}>ACCIONES</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((item, idx) => (
-                <tr key={item.id} style={{ borderBottom: '1px solid var(--border)', backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB' }}>
-                  <td style={{ padding: '12px 16px' }}>
-                    <div className="font-mono" style={{ fontWeight: 700, color: 'var(--navy-900)' }}>{item.serial}</div>
-                    <div className="font-mono microlabel-sm" style={{ color: 'var(--text-muted)' }}>{item.placaRump}</div>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <div style={{ fontWeight: 600 }}>{item.establecimiento}</div>
-                    <div className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>NIT: {item.nit}</div>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <div>{item.tipoInstrumento}</div>
-                    <div className="font-mono" style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{item.capacidadMax} · {item.divisionEscala}</div>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <div className="font-mono" style={{ fontWeight: 600 }}>{item.precintoSIMEL}</div>
-                  </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                    <span className={`status-pill ${item.estado.includes('VIGENTE') ? 'ok' : item.estado.includes('POR VENCER') ? 'warn' : 'danger'}`}>
-                      {item.estado}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                      <button
-                        type="button"
-                        className="btn-gov-compact"
-                        onClick={() => setSelectedInstrument(item)}
-                      >
-                        <EyeIcon size={12} />
-                        <span>Ver Ficha</span>
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-gov-compact"
-                        onClick={() => handleDelete(item)}
-                        disabled={deletingId === item.id}
-                        style={{ color: '#DC2626', borderColor: '#FCA5A5' }}
-                        title="Revocar e inactivar instrumento (Requiere Admin)"
-                      >
-                        <TrashIcon size={12} />
-                        <span>{deletingId === item.id ? '...' : 'Eliminar'}</span>
-                      </button>
-                    </div>
+              {!loading && rows.length === 0 && (
+                <tr>
+                  <td colSpan={8} style={{ ...td, textAlign: 'center', color: 'var(--text-muted)', padding: '28px' }}>
+                    No hay equipos que cumplan los filtros indicados.
                   </td>
                 </tr>
-              ))}
+              )}
+              {rows.map((r, idx) => {
+                const inactivo = r.activo === false;
+                return (
+                  <tr
+                    key={idOf(r)}
+                    data-testid="fila-equipo"
+                    style={{ borderBottom: '1px solid var(--border)', backgroundColor: idx % 2 === 0 ? '#FFFFFF' : '#F9FAFB', opacity: inactivo ? 0.8 : 1 }}
+                  >
+                    <td style={td}>
+                      <div className="font-mono" style={{ fontWeight: 700, color: 'var(--navy-900)' }}>{r.serial}</div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{r.modelo}</div>
+                    </td>
+                    <td style={td}>{r.marca}</td>
+                    <td style={td}>
+                      {r.tipo}
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{r.categoriaExactitud}</div>
+                    </td>
+                    <td style={{ ...td, textAlign: 'right' }} className="font-mono">{r.capacidadMinima ?? 0} {unidad(r)}</td>
+                    <td style={{ ...td, textAlign: 'right' }} className="font-mono">{r.capacidadMaxima} {unidad(r)}</td>
+                    <td style={{ ...td, textAlign: 'center' }}>
+                      <span className={`status-pill ${pillClass(r.estado)}`}>{r.estado}</span>
+                      {inactivo && (
+                        <div style={{ marginTop: 4 }}>
+                          <span className="status-pill danger" data-testid="badge-inactivo" title={r.motivoInactivacion}>
+                            INACTIVO
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td style={td}>
+                      {formatCalendarDate(r.createdAt)}
+                      <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{r.createdAt ? formatDateTime(r.createdAt) : ''}</div>
+                    </td>
+                    <td style={{ ...td, textAlign: 'right' }}>
+                      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px', flexWrap: 'wrap' }}>
+                        <button type="button" className="btn-gov-compact" onClick={() => setFicha(mapBackendInstrumentToFrontend(r))}>
+                          <EyeIcon size={12} />
+                          <span>Ficha</span>
+                        </button>
+                        <button type="button" className="btn-gov-compact" onClick={() => setHistorial(r)}>
+                          Historial
+                        </button>
+                        <button type="button" className="btn-gov-compact" onClick={() => setEvidencias(r)}>
+                          Evidencias
+                        </button>
+                        {canEdit && (
+                          <button type="button" className="btn-gov-compact" onClick={() => setEditando(r)}>
+                            <EditIcon size={12} />
+                            <span>Editar</span>
+                          </button>
+                        )}
+                        {isAdmin && (
+                          <button
+                            type="button"
+                            className="btn-gov-compact"
+                            onClick={() => setToggle(r)}
+                            style={inactivo ? undefined : { color: '#DC2626', borderColor: '#FCA5A5' }}
+                          >
+                            {inactivo ? 'Reactivar' : 'Inactivar'}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
 
-        <InspectionDetailModal
-          instrument={selectedInstrument}
-          onClose={() => setSelectedInstrument(null)}
-        />
+        {totalPages > 1 && (
+          <nav aria-label="Paginación" style={{ display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center', marginTop: '14px' }}>
+            <button type="button" className="btn-gov-compact" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>
+              Anterior
+            </button>
+            <span style={{ fontSize: '12px' }}>
+              Página {page} de {totalPages}
+            </span>
+            <button type="button" className="btn-gov-compact" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>
+              Siguiente
+            </button>
+          </nav>
+        )}
+
+        <InspectionDetailModal instrument={ficha} onClose={() => setFicha(null)} />
+
+        {historial && <EquipmentHistoryModal instrumentId={idOf(historial)} serial={historial.serial} onClose={() => setHistorial(null)} />}
+        {editando && (
+          <EditInstrumentModal
+            item={editando}
+            onClose={() => setEditando(null)}
+            onSaved={() => {
+              setEditando(null);
+              refreshAll();
+            }}
+          />
+        )}
+        {evidencias && (
+          <EvidenceManagerModal
+            instrumentId={idOf(evidencias)}
+            serial={evidencias.serial}
+            canEdit={canEdit}
+            onClose={() => setEvidencias(null)}
+            onChanged={refreshAll}
+          />
+        )}
+        {toggle && (
+          <ToggleActiveModal
+            id={idOf(toggle)}
+            serial={toggle.serial}
+            activo={toggle.activo !== false}
+            onClose={() => setToggle(null)}
+            onDone={() => {
+              setToggle(null);
+              refreshAll();
+            }}
+          />
+        )}
       </div>
     </div>
   );

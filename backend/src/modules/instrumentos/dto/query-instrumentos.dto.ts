@@ -7,6 +7,7 @@ import {
   Max,
   IsDateString,
   IsIn,
+  IsNumber,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
@@ -75,4 +76,36 @@ export class QueryInstrumentosDto {
   @IsOptional()
   @IsDateString({}, { message: 'fechaHasta debe ser una fecha ISO válida.' })
   fechaHasta?: string;
+
+  /** HU-10 */
+  @IsOptional()
+  @IsString()
+  marca?: string;
+
+  /** HU-10: 'true' | 'false' (HU-08: consultar inactivos). Sin valor devuelve todos. */
+  @IsOptional()
+  @IsIn(['true', 'false'], { message: 'activo debe ser true o false.' })
+  activo?: 'true' | 'false';
+
+  /** HU-10: rango de capacidad maxima. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'capacidadDesde debe ser numerico.' })
+  @Min(0)
+  capacidadDesde?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber({}, { message: 'capacidadHasta debe ser numerico.' })
+  @Min(0)
+  capacidadHasta?: number;
+
+  /** HU-10: fecha de registro (createdAt). */
+  @IsOptional()
+  @IsDateString({}, { message: 'registroDesde debe ser una fecha ISO valida.' })
+  registroDesde?: string;
+
+  @IsOptional()
+  @IsDateString({}, { message: 'registroHasta debe ser una fecha ISO valida.' })
+  registroHasta?: string;
 }

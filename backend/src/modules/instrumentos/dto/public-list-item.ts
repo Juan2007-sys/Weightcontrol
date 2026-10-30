@@ -7,6 +7,11 @@ const CAMPOS_PRIVADOS = [
   'actualizadoPor',
   'evidenciasFotograficas',
   'ubicacionFisica',
+  // HU-08/HU-09: quien inactivo, por que y quien cargo cada foto son datos internos.
+  'inactivadoPor',
+  'motivoInactivacion',
+  'fechaInactivacion',
+  'evidenciasMeta',
 ] as const;
 
 export type PublicListItem = Omit<InstrumentoResponseDto, (typeof CAMPOS_PRIVADOS)[number]>;

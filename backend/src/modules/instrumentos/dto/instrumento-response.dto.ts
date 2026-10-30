@@ -26,6 +26,11 @@ export interface InstrumentoResponseDto {
   fechaUltimaCalibracion: Date;
   fechaProximaCalibracion: Date;
   estado: EstadoInstrumento;
+  activo: boolean;
+  fechaInactivacion?: Date;
+  inactivadoPor?: any;
+  motivoInactivacion?: string;
+  evidenciasMeta?: Record<string, { fechaCarga?: Date; cargadoPor?: any }>;
   creadoPor?: any;
   actualizadoPor?: any;
   createdAt?: Date;

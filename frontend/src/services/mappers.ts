@@ -10,6 +10,7 @@ export interface BackendInstrumento {
   tipo: string;
   categoriaExactitud: string;
   capacidadMaxima: number;
+  capacidadMinima?: number;
   unidadMedida?: string;
   divisionEscala?: number;
   numeroDivisionesVerificacion?: number;
@@ -30,6 +31,12 @@ export interface BackendInstrumento {
   fechaUltimaCalibracion: string | Date;
   fechaProximaCalibracion: string | Date;
   estado: 'Vigente' | 'Por vencer' | 'Vencido' | string;
+  /** HU-08: false = inactivo (no admite nuevas calibraciones). Ausente en datos antiguos = activo. */
+  activo?: boolean;
+  fechaInactivacion?: string;
+  motivoInactivacion?: string;
+  inactivadoPor?: { nombre?: string; email?: string } | string;
+  actualizadoPor?: { nombre?: string; email?: string } | string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -60,20 +67,8 @@ export function mapBackendInstrumentToFrontend(item: BackendInstrumento): Metrol
   const unidad = item.unidadMedida || 'kg';
   const division = item.divisionEscala ? `e = ${item.divisionEscala} ${unidad}, d = ${item.divisionEscala} ${unidad}` : 'No especificada';
   
-  // Asignación de coordenadas por departamento/ciudad básica para visualización geográfica
-  const ciudad = item.propietario?.ciudad || 'Bogotá D.C.';
-  let latitud = 4.7110;
-  let longitud = -74.0721;
-  if (ciudad.toLowerCase().includes('medellín') || ciudad.toLowerCase().includes('antioquia')) {
-    latitud = 6.2442;
-    longitud = -75.5812;
-  } else if (ciudad.toLowerCase().includes('cali') || ciudad.toLowerCase().includes('valle')) {
-    latitud = 3.4516;
-    longitud = -76.5320;
-  } else if (ciudad.toLowerCase().includes('barranquilla') || ciudad.toLowerCase().includes('atlántico')) {
-    latitud = 10.9685;
-    longitud = -74.7813;
-  }
+  // Sin dato de ubicacion NO se inventa una (antes se asumia Bogota): se muestra "No registrado".
+  const ciudad = item.propietario?.ciudad || 'No registrado';
 
   const estadoFrontend = mapBackendStatusToFrontend(item.estado);
 
@@ -96,7 +91,7 @@ export function mapBackendInstrumentToFrontend(item: BackendInstrumento): Metrol
     placaRump: `RUMP-CO-${item.serial.replace(/[^0-9]/g, '').slice(-6) || '841920'}`,
     establecimiento: item.propietario?.nombreRazonSocial || 'Establecimiento no registrado',
     nit: item.propietario?.nitRut || 'No registrado',
-    departamento: item.propietario?.departamento || 'Cundinamarca',
+    departamento: item.propietario?.departamento || 'No registrado',
     municipio: ciudad,
     tipoInstrumento: `${item.tipo} (${item.categoriaExactitud || 'Clase III'})`,
     marca: item.marca,
@@ -112,8 +107,7 @@ export function mapBackendInstrumentToFrontend(item: BackendInstrumento): Metrol
     hsmKey: 'HSM-KEY #9842',
     versionFirmware: '4.12.8-STABLE',
     accionRecomendada,
-    latitud,
-    longitud,
     evidenciasFotograficas: item.evidenciasFotograficas,
+    activo: item.activo !== false,
   };
 }

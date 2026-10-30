@@ -27,7 +27,7 @@ export class ValidationEngineService {
       return {
         isValid: false,
         errors: [
-          `No existe un validador normativo registrado para el tipo de instrumento "${data.tipo}".`,
+          `Tipo de instrumento no soportado: no existe un validador normativo registrado para "${data.tipo}".`,
         ],
       };
     }

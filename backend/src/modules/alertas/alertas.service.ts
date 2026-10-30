@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
@@ -17,6 +18,7 @@ import {
   EntidadAfectada,
 } from '../../schemas/index.js';
 import { AuditService } from '../audit/audit.service.js';
+import { ConfiguracionService } from '../configuracion/configuracion.service.js';
 import { NotificadorEngineService } from './notificador-engine.service.js';
 import { QueryAlertasDto } from './dto/query-alertas.dto.js';
 import { AlertaResponseDto } from './dto/alerta-response.dto.js';
@@ -34,6 +36,8 @@ export class AlertasService {
     private readonly instrumentoModel: Model<InstrumentoDocument>,
     private readonly notificadorEngine: NotificadorEngineService,
     private readonly auditService: AuditService,
+    @Optional()
+    private readonly configuracionService?: ConfiguracionService,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
@@ -54,7 +58,13 @@ export class AlertasService {
     alertasGeneradas: number;
     alertas: AlertaResponseDto[];
   }> {
-    const instrumentos = await this.instrumentoModel.find().exec();
+    // M3: el umbral se lee de la configuracion en cada escaneo (sin redesplegar). Los niveles
+    // critico/moderado conservan 5/15 dias, acotados al umbral si este es menor.
+    const umbral = (await this.configuracionService?.getUmbralDias()) ?? 30;
+    const umbralCritico = Math.min(5, umbral);
+    const umbralModerado = Math.min(15, umbral);
+    // HU-08: los equipos inactivos no generan alertas.
+    const instrumentos = await this.instrumentoModel.find({ activo: { $ne: false } }).exec();
     const ahora = new Date();
     const hoyInicio = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate());
 
@@ -85,15 +95,15 @@ export class AlertasService {
         nivelCriticidad = NivelAlerta.VENCIDA;
         nuevoEstado = EstadoInstrumento.VENCIDO;
         mensaje = `El instrumento con serial ${inst.serial} tiene la calibración VENCIDA desde hace ${Math.abs(diasRestantes)} día(s). Se requiere calibración inmediata.`;
-      } else if (diasRestantes <= 5) {
+      } else if (diasRestantes <= umbralCritico) {
         nivelCriticidad = NivelAlerta.CRITICA;
         nuevoEstado = EstadoInstrumento.POR_VENCER;
         mensaje = `¡ALERTA CRÍTICA! La calibración del instrumento ${inst.serial} vencerá en ${diasRestantes} día(s) (Fecha: ${fechaProx.toISOString().split('T')[0]}).`;
-      } else if (diasRestantes <= 15) {
+      } else if (diasRestantes <= umbralModerado) {
         nivelCriticidad = NivelAlerta.MODERADA;
         nuevoEstado = EstadoInstrumento.POR_VENCER;
         mensaje = `Alerta moderada: La calibración del instrumento ${inst.serial} vencerá en ${diasRestantes} días.`;
-      } else if (diasRestantes <= 30) {
+      } else if (diasRestantes <= umbral) {
         nivelCriticidad = NivelAlerta.PREVENTIVA;
         nuevoEstado = EstadoInstrumento.POR_VENCER;
         mensaje = `Aviso preventivo: La calibración del instrumento ${inst.serial} vencerá en ${diasRestantes} días.`;

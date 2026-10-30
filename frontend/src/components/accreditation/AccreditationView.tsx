@@ -5,6 +5,7 @@ import type { MetrologicalInstrument } from '../../types/metrology';
 import { RegisterCalibrationModal } from '../calibration/RegisterCalibrationModal';
 import { PdfCertificateViewerModal } from '../common/PdfCertificateViewerModal';
 import { useAuth } from '../../context/AuthContext';
+import { canIssueCalibration } from '../../utils/permissions';
 import { toast } from 'sonner';
 import { formatCalendarDate } from '../../utils/dates';
 
@@ -164,22 +165,18 @@ export const AccreditationView: React.FC<AccreditationViewProps> = ({ instrument
           </div>
 
           <div style={{ display: 'flex', gap: '10px' }}>
+            {canIssueCalibration(user?.rol) && (
             <button
               type="button"
               className="btn-gov-primary"
-              onClick={() => {
-                if (user && user.rol === 'AUDITOR') {
-                  toast.error('🛑 Privilegio Restringido: Los Auditores no tienen permiso para emitir certificados de calibración.');
-                  return;
-                }
-                setShowCalibrationModal(true);
-              }}
+              onClick={() => setShowCalibrationModal(true)}
               style={{ padding: '10px 18px', fontSize: '13px', gap: '8px' }}
             >
               <PlusIcon size={16} />
               <ShieldCheckIcon size={16} />
               <span>Registrar Calibración y Emitir Certificado</span>
             </button>
+            )}
           </div>
         </div>
 

@@ -20,6 +20,8 @@ import { PublicVerificationView } from './components/public/PublicVerificationVi
 import { LoginView } from './components/auth/LoginView';
 import { Toaster, toast } from 'sonner';
 import { readVerificationParam } from './utils/verificationUrl';
+import { canRegisterInstrument, SCREENS_REQUIRING_LOGIN } from './utils/permissions';
+import { zonaDeDepartamento } from './utils/territorio';
 import { motion, AnimatePresence } from 'framer-motion';
 
 const INITIAL_FILTERS: FilterCriteria = {
@@ -38,6 +40,7 @@ export const App: React.FC = () => {
     initialVerification ? 'consulta-publica' : 'auditoria',
   );
   const [instruments, setInstruments] = useState<MetrologicalInstrument[]>([]);
+  const { isLoading: authLoading } = useAuth();
   const [filters, setFilters] = useState<FilterCriteria>(INITIAL_FILTERS);
   const [activeFilterQuery, setActiveFilterQuery] = useState<FilterCriteria>(INITIAL_FILTERS);
   const [publicVerificationSerial, setPublicVerificationSerial] = useState<string>(initialVerification);
@@ -45,17 +48,46 @@ export const App: React.FC = () => {
   const fetchInstruments = useCallback(async () => {
     try {
       const res = await instrumentosService.getAll({ limit: 100 });
-      if (res.items && res.items.length > 0) {
-        setInstruments(res.items);
+      // HU-08: los equipos inactivos no se muestran en el tablero de fiscalizacion.
+      const activos = (res.items ?? []).filter((i) => i.activo !== false);
+      if (activos.length > 0) {
+        setInstruments(activos);
       }
     } catch {
       // Fallback a mock data si el backend aún no tiene datos o está offline
     }
   }, []);
 
+  // Se recarga al iniciar o cerrar sesion: con sesion el listado incluye los datos del propietario
+  // (departamento, municipio) que el listado publico no entrega.
   useEffect(() => {
     fetchInstruments();
-  }, [fetchInstruments]);
+  }, [fetchInstruments, user?.id]);
+
+  // Sesion obligatoria para los modulos tecnicos: sin sesion se redirige al login (el backend
+  // tambien responde 401, esto evita ofrecer formularios que no se pueden usar).
+  const requiresLogin = (screen: ActiveScreen) => (SCREENS_REQUIRING_LOGIN as readonly string[]).includes(screen);
+
+  const navigate = (screen: ActiveScreen) => {
+    if (requiresLogin(screen) && !user) {
+      toast.info('Inicie sesión para acceder a este módulo.');
+      setActiveScreen('login');
+      return;
+    }
+    if (screen === 'registro' && !canRegisterInstrument(user?.rol)) {
+      toast.error('Su rol no tiene permiso para registrar instrumentos.');
+      return;
+    }
+    setActiveScreen(screen);
+  };
+
+  // Defensa en profundidad: si la sesion se cierra estando en un modulo protegido, se muestra el login.
+  const shownScreen: ActiveScreen =
+    !authLoading && requiresLogin(activeScreen) && !user
+      ? 'login'
+      : activeScreen === 'registro' && !canRegisterInstrument(user?.rol)
+        ? 'instrumentos'
+        : activeScreen;
 
   const handleFilterChange = (field: keyof FilterCriteria, value: string) => {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -89,6 +121,16 @@ export const App: React.FC = () => {
         return `NIVEL L1 · USUARIO (${user.nombre})`;
     }
   }, [user]);
+
+  // Zonas para el filtro: solo las que tienen equipos registrados.
+  const zoneOptions = useMemo(() => {
+    const m = new Map<string, { clave: string; nombre: string }>();
+    for (const i of instruments) {
+      const z = zonaDeDepartamento(i.departamento);
+      if (!m.has(z.clave)) m.set(z.clave, { clave: z.clave, nombre: z.nombre });
+    }
+    return [...m.values()].sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  }, [instruments]);
 
   // Filtrado reactivo de datos según criterios aplicados
   const filteredInstruments = useMemo(() => {
@@ -133,7 +175,7 @@ export const App: React.FC = () => {
 
       // Filtro por jurisdicción / municipio
       if (activeFilterQuery.jurisdiccion !== '') {
-        if (!item.municipio.includes(activeFilterQuery.jurisdiccion)) {
+        if (zonaDeDepartamento(item.departamento).clave !== activeFilterQuery.jurisdiccion) {
           return false;
         }
       }
@@ -150,7 +192,7 @@ export const App: React.FC = () => {
       <GovBar />
 
       {/* 2. Cabecera de Marca Oficial (72px, blanco) */}
-      <BrandHeader activeScreen={activeScreen} onNavigate={setActiveScreen} />
+      <BrandHeader activeScreen={shownScreen} onNavigate={navigate} />
 
       {/* 3. Franja de Contexto Técnico (#F0F3F8, 1px border) */}
       <TechnicalStatusStrip />
@@ -159,13 +201,13 @@ export const App: React.FC = () => {
       <main style={{ flex: 1 }}>
         <AnimatePresence mode="wait">
           <motion.div
-            key={activeScreen}
+            key={shownScreen}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.22, ease: [0.25, 0.1, 0.25, 1.0] }}
           >
-            {activeScreen === 'auditoria' && (
+            {shownScreen === 'auditoria' && (
               <>
                 {/* 4. Breadcrumb Institucional con Chips OEC */}
                 <Breadcrumbs
@@ -181,13 +223,7 @@ export const App: React.FC = () => {
                   onExportReport={(format) => {
                     toast.success(`Generando Informe Forense Oficial (${format}) con trazabilidad NIST UTC-5 y hash SHA-256...`);
                   }}
-                  onNewInspection={() => {
-                    if (user && user.rol === 'AUDITOR') {
-                      toast.error('🛑 Privilegio Restringido: Los Auditores tienen permiso exclusivo de consulta y fiscalización forense.');
-                      return;
-                    }
-                    setActiveScreen('registro');
-                  }}
+                  onNewInspection={canRegisterInstrument(user?.rol) ? () => navigate('registro') : undefined}
                 />
 
                 {/* 6. Fila de 4 Tarjetas KPI con Borde Lateral Semántico */}
@@ -199,6 +235,7 @@ export const App: React.FC = () => {
                   onFilterChange={handleFilterChange}
                   onReset={handleResetFilters}
                   onApply={handleApplyFilters}
+                  zones={zoneOptions}
                 />
 
                 {/* 8. Tabla de Datos / Vista Cartográfica */}
@@ -209,7 +246,7 @@ export const App: React.FC = () => {
               </>
             )}
 
-            {activeScreen === 'registro' && (
+            {shownScreen === 'registro' && (
               <>
                 <Breadcrumbs
                   moduleName="MÓDULO TÉCNICO"
@@ -239,7 +276,7 @@ export const App: React.FC = () => {
               </>
             )}
 
-            {activeScreen === 'instrumentos' && (
+            {shownScreen === 'instrumentos' && (
               <>
                 <Breadcrumbs
                   moduleName="MÓDULO TÉCNICO"
@@ -250,13 +287,7 @@ export const App: React.FC = () => {
                 />
                 <InstrumentsListView
                   instruments={instruments}
-                  onNewInstrument={() => {
-                    if (user && user.rol === 'AUDITOR') {
-                      toast.error('🛑 Privilegio Restringido: Los Auditores no tienen permiso para registrar instrumentos.');
-                      return;
-                    }
-                    setActiveScreen('registro');
-                  }}
+                  onNewInstrument={canRegisterInstrument(user?.rol) ? () => navigate('registro') : undefined}
                   onRefresh={fetchInstruments}
                   onDeleteInstrument={(id) => setInstruments((prev) => prev.filter((item) => item.id !== id))}
                 />
@@ -264,7 +295,7 @@ export const App: React.FC = () => {
               </>
             )}
 
-            {activeScreen === 'validaciones' && (
+            {shownScreen === 'validaciones' && (
               <>
                 <Breadcrumbs
                   moduleName="ORGANISMOS ACREDITADOS"
@@ -278,7 +309,7 @@ export const App: React.FC = () => {
               </>
             )}
 
-            {activeScreen === 'administracion' && (
+            {shownScreen === 'administracion' && (
               <>
                 <Breadcrumbs
                   moduleName="CONSOLA DE MANDO CENTRALIZADA"
@@ -296,7 +327,7 @@ export const App: React.FC = () => {
               </>
             )}
 
-            {activeScreen === 'consulta-publica' && (
+            {shownScreen === 'consulta-publica' && (
               <>
                 <Breadcrumbs
                   moduleName="PORTAL NACIONAL DE TRANSPARENCIA"
@@ -313,7 +344,7 @@ export const App: React.FC = () => {
               </>
             )}
 
-            {activeScreen === 'login' && (
+            {shownScreen === 'login' && (
               <>
                 <Breadcrumbs
                   moduleName="PORTAL DE ACCESO RESTRINGIDO"
