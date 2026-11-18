@@ -37,10 +37,12 @@ export const Breadcrumbs: React.FC<BreadcrumbsProps> = ({
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '8px',
+            flexWrap: 'wrap',
+            gap: '6px 8px',
             listStyle: 'none',
             margin: 0,
             padding: 0,
+            maxWidth: '100%',
           }}
           className="microlabel"
         >

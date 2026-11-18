@@ -6,20 +6,21 @@ export const GovBar: React.FC = () => {
       style={{
         backgroundColor: 'var(--gov-bar)',
         color: '#FFFFFF',
-        height: '28px',
+        minHeight: '28px',
+        padding: '4px 0',
         display: 'flex',
         alignItems: 'center',
         borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
         userSelect: 'none',
         fontSize: '11px',
-        lineHeight: 1,
+        lineHeight: 1.2,
       }}
       role="region"
       aria-label="Barra de Gobierno Nacional de la República de Colombia"
     >
-      <div className="gov-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+      <div className="gov-container" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', flexWrap: 'wrap', gap: '6px' }}>
         {/* Izquierda: Pill Colombia + Entidades en microlabel */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
           <span
             style={{
               backgroundColor: '#FFFFFF',
@@ -30,12 +31,13 @@ export const GovBar: React.FC = () => {
               fontSize: '9px',
               letterSpacing: '0.08em',
               textTransform: 'uppercase',
+              whiteSpace: 'nowrap',
             }}
           >
             REPÚBLICA DE COLOMBIA
           </span>
 
-          <nav aria-label="Entidades del Estado" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94A3B8' }} className="microlabel-sm">
+          <nav aria-label="Entidades del Estado" style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#94A3B8' }} className="microlabel-sm gov-bar-desktop-only">
             <span>GOBIERNO NACIONAL</span>
             <span aria-hidden="true" style={{ opacity: 0.5 }}>·</span>
             <span style={{ color: '#E2E8F0', fontWeight: 600 }}>SUPERINTENDENCIA DE INDUSTRIA Y COMERCIO (SIC)</span>
@@ -45,13 +47,13 @@ export const GovBar: React.FC = () => {
         </div>
 
         {/* Derecha: Canal de atención oficial SIC */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', color: '#CBD5E1' }} className="microlabel-sm">
-          <span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#CBD5E1' }} className="microlabel-sm">
+          <span className="gov-bar-desktop-only">
             CANAL DE ATENCIÓN CIUDADANA Y RADICACIÓN
           </span>
-          <span aria-hidden="true" style={{ opacity: 0.4 }}>|</span>
-          <span style={{ fontWeight: 700, color: '#FFFFFF', letterSpacing: '0.08em' }}>
-            LÍNEA NACIONAL SIC: 01 8000 910165
+          <span aria-hidden="true" className="gov-bar-desktop-only" style={{ opacity: 0.4 }}>|</span>
+          <span style={{ fontWeight: 700, color: '#FFFFFF', letterSpacing: '0.06em', whiteSpace: 'nowrap' }}>
+            SIC: 01 8000 910165
           </span>
         </div>
       </div>

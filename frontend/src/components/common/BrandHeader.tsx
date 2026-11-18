@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { ActiveScreen } from '../../types/metrology';
 import { UserCheckIcon, ShieldCheckIcon } from './Icons';
 import { useAuth } from '../../context/AuthContext';
@@ -11,8 +11,10 @@ interface BrandHeaderProps {
 
 export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNavigate }) => {
   const { user, isAuthenticated, logout } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleNavigate = (screen: ActiveScreen) => {
+    setMobileMenuOpen(false);
     // Verificación de RBAC en frontend para feedback inmediato
     if (screen === 'administracion') {
       if (user && !['ADMIN', 'AUDITOR', 'SIC'].includes(user.rol)) {
@@ -49,7 +51,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
         }}
       >
         {/* Marca Institucional SIC & WeightControl */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: '1 1 auto' }}>
           {/* Isotipo Circular Oficial */}
           <div
             style={{
@@ -126,6 +128,7 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
 
         {/* Navegación Horizontal en Microlabel con Bloque Sólido Navy en Activo */}
         <nav
+          className="header-desktop-nav"
           aria-label="Navegación del Sistema Metrológico"
           style={{
             display: 'flex',
@@ -233,8 +236,8 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
           </button>
         </nav>
 
-        {/* Perfil de Usuario con Rol / Acceso a Login */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+        {/* Perfil de Usuario con Rol / Acceso a Login (Desktop) */}
+        <div className="header-desktop-user" style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           {isAuthenticated && user ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <div
@@ -312,7 +315,123 @@ export const BrandHeader: React.FC<BrandHeaderProps> = ({ activeScreen, onNaviga
             </button>
           )}
         </div>
+
+        {/* Botón menú móvil (iPhone / Android / Tablet <= 1024px) */}
+        <button
+          type="button"
+          className="header-mobile-toggle btn-gov-compact"
+          aria-label={mobileMenuOpen ? 'Cerrar menú de navegación' : 'Abrir menú de navegación'}
+          aria-expanded={mobileMenuOpen}
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+          style={{
+            height: '38px',
+            minWidth: '42px',
+            padding: '0 10px',
+            fontSize: '18px',
+            fontWeight: 700,
+            alignItems: 'center',
+            justifyContent: 'center',
+            flexShrink: 0,
+          }}
+        >
+          {mobileMenuOpen ? '✕' : '☰'}
+        </button>
       </div>
+
+      {/* Menú desplegable móvil */}
+      {mobileMenuOpen && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '72px',
+            left: 0,
+            right: 0,
+            backgroundColor: 'var(--surface)',
+            borderBottom: '2px solid var(--navy-900)',
+            boxShadow: '0 12px 24px rgba(15, 23, 42, 0.16)',
+            zIndex: 50,
+            padding: '12px 16px',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}
+        >
+          {[
+            { id: 'auditoria' as ActiveScreen, label: 'Auditoría y Fiscalización' },
+            { id: 'instrumentos' as ActiveScreen, label: 'Mis Instrumentos' },
+            { id: 'validaciones' as ActiveScreen, label: 'Actas y Ensayos' },
+            {
+              id: 'administracion' as ActiveScreen,
+              label: user && user.rol !== 'ADMIN' ? 'Trazabilidad y Auditoría' : 'Administración del Sistema',
+            },
+            { id: 'consulta-publica' as ActiveScreen, label: '🔍 Consulta Pública (QR)' },
+          ].map((item) => {
+            const isActive =
+              activeScreen === item.id ||
+              (item.id === 'instrumentos' && activeScreen === 'registro');
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => handleNavigate(item.id)}
+                className="microlabel"
+                style={{
+                  width: '100%',
+                  textAlign: 'left',
+                  padding: '12px 14px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border)',
+                  backgroundColor: isActive ? 'var(--navy-900)' : '#F8FAFC',
+                  color: isActive ? '#FFFFFF' : 'var(--navy-900)',
+                  fontWeight: 700,
+                }}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+
+          <div style={{ borderTop: '1px solid var(--border)', paddingTop: '10px', marginTop: '4px' }}>
+            {isAuthenticated && user ? (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: '12px', fontWeight: 700, color: 'var(--navy-900)', textTransform: 'uppercase' }}>
+                    {user.nombre}
+                  </div>
+                  <div className="font-mono" style={{ fontSize: '10px', color: 'var(--blue-600)', fontWeight: 700 }}>
+                    ROL: {user.rol}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    logout();
+                    onNavigate('login');
+                  }}
+                  className="btn-gov-compact"
+                  style={{ height: '34px', fontSize: '11px', color: '#991B1B', borderColor: 'var(--danger)' }}
+                >
+                  Salir
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onNavigate('login');
+                }}
+                className="btn-gov-primary"
+                style={{ width: '100%', height: '38px', fontSize: '12px' }}
+              >
+                <UserCheckIcon size={14} />
+                <span>Ingreso Institucional</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </header>
   );
 };

@@ -35,9 +35,9 @@ export const TitleBlock: React.FC<TitleBlockProps> = ({ onExportReport, onNewIns
           <h1
             style={{
               fontFamily: 'var(--font-heading)',
-              fontSize: '44px',
+              fontSize: 'clamp(26px, 5vw, 44px)',
               fontWeight: 800,
-              lineHeight: 1.06,
+              lineHeight: 1.08,
               letterSpacing: '-0.025em',
               color: 'var(--navy-900)',
               margin: 0,
@@ -88,9 +88,11 @@ export const TitleBlock: React.FC<TitleBlockProps> = ({ onExportReport, onNewIns
           style={{
             display: 'flex',
             alignItems: 'center',
+            flexWrap: 'wrap',
             gap: '12px',
             paddingTop: '6px',
-            flexShrink: 0,
+            flexShrink: 1,
+            maxWidth: '100%',
           }}
         >
           <button

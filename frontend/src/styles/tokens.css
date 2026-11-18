@@ -314,3 +314,58 @@ input, select, textarea {
   --info-border: #93B4F5;
   --info-text: #1E3A8A;
 }
+
+/* ==========================================================================
+   RESPONSIVE MOBILE (iPhone 390px / Android 360px / Tablet)
+   ========================================================================== */
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.header-mobile-toggle {
+  display: none !important;
+}
+
+@media (max-width: 1024px) {
+  .header-desktop-nav,
+  .header-desktop-user {
+    display: none !important;
+  }
+
+  .header-mobile-toggle {
+    display: inline-flex !important;
+  }
+}
+
+@media (max-width: 900px) {
+  .gov-bar-desktop-only {
+    display: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .gov-container {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .status-pill {
+    white-space: normal;
+    max-width: 100%;
+    word-break: break-word;
+  }
+
+  .btn-gov-primary,
+  .btn-gov-secondary {
+    max-width: 100%;
+    white-space: normal;
+    text-align: center;
+    height: auto;
+    min-height: 38px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+}
