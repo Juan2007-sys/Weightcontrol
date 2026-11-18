@@ -128,6 +128,8 @@ input, select, textarea {
   padding-left: 20px;
   padding-right: 20px;
   width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 @media (min-width: 1320px) {
@@ -265,6 +267,8 @@ input, select, textarea {
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   position: relative;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Acento lateral característico de 4px */
