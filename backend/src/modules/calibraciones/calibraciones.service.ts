@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, isValidObjectId } from 'mongoose';
+import { createHmac, timingSafeEqual } from 'crypto';
 import {
   Calibracion,
   CalibracionDocument,
@@ -16,6 +17,8 @@ import {
   InstrumentoDocument,
   Certificado,
   CertificadoDocument,
+  Usuario,
+  UsuarioDocument,
   EstadoInstrumento,
   ResultadoCalibracion,
   TipoAccionAuditoria,
@@ -24,11 +27,12 @@ import {
 } from '../../schemas/index.js';
 import { AuditService } from '../audit/audit.service.js';
 import { InstrumentosService } from '../instrumentos/instrumentos.service.js';
+import { AlertasService } from '../alertas/alertas.service.js';
 import { PdfGeneratorService } from './pdf-generator.service.js';
 import { CreateCalibracionDto } from './dto/create-calibracion.dto.js';
 import { UpdateCalibracionDto } from './dto/update-calibracion.dto.js';
 import { CorregirCalibracionDto } from './dto/corregir-calibracion.dto.js';
-import { buildSignedVerificationUrl } from './qr-signature.js';
+import { buildSignedVerificationUrl, getQrSigningSecret } from './qr-signature.js';
 import { QueryCalibracionesDto } from './dto/query-calibraciones.dto.js';
 import { CalibracionResponseDto } from './dto/calibracion-response.dto.js';
 import { PaginatedResponseDto } from '../instrumentos/dto/paginated-response.dto.js';
@@ -48,6 +52,11 @@ export class CalibracionesService {
     @Optional()
     @InjectModel(Certificado.name)
     private readonly certificadoModel?: Model<CertificadoDocument>,
+    @Optional()
+    @InjectModel(Usuario.name)
+    private readonly usuarioModel?: Model<UsuarioDocument>,
+    @Optional()
+    private readonly alertasService?: AlertasService,
   ) {}
 
   async create(
@@ -141,6 +150,15 @@ export class CalibracionesService {
           pdfUrl: `/api/calibraciones/${guardada._id}/pdf`,
         });
         await certDoc.save();
+        if (this.alertasService) {
+          await this.alertasService
+            .notificarNuevoCertificado(
+              instrumento.serial,
+              guardada.numeroCertificado,
+              fechaCal,
+            )
+            .catch(() => {});
+        }
       } catch (certErr) {
         this.logger.warn(`Error al guardar certificado espejo: ${certErr}`);
       }
@@ -590,5 +608,224 @@ export class CalibracionesService {
       createdAt: (doc as any).createdAt,
       updatedAt: (doc as any).updatedAt,
     };
+  }
+
+  /**
+   * HU-12: Firma electrónica/digital de un certificado de calibración.
+   * Bloquea modificaciones posteriores, conserva el hash original y registra auditoría.
+   */
+  async firmarCertificado(
+    idOrNumCertificado: string,
+    userId: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<{
+    calibracionId: string;
+    numeroCertificado: string;
+    codigoFolio: string;
+    firmado: boolean;
+    firmante: string;
+    cargo: string;
+    fechaFirma: Date;
+    hashFirma: string;
+    bloqueadoInmutable: boolean;
+  }> {
+    const calibracion = await this.findCalibracionByIdOrNumero(idOrNumCertificado);
+    if (!calibracion) {
+      throw new NotFoundException(
+        `Certificado de calibración '${idOrNumCertificado}' no encontrado.`,
+      );
+    }
+
+    if (calibracion.anulado) {
+      throw new BadRequestException(
+        'No se puede firmar un certificado que ha sido anulado.',
+      );
+    }
+
+    const existingCert = this.certificadoModel
+      ? await this.certificadoModel.findOne({ calibracion: String(calibracion._id) }).exec()
+      : null;
+
+    if (existingCert?.firmaDigital?.hashFirma) {
+      throw new ConflictException(
+        `El certificado '${calibracion.numeroCertificado}' ya se encuentra firmado electrónicamente.`,
+      );
+    }
+
+    const user = this.usuarioModel
+      ? await this.usuarioModel.findById(userId).lean()
+      : null;
+    const firmante = user?.nombre || `Usuario ${userId}`;
+    const cargo = user?.rol || 'TECNICO';
+    const fechaFirma = new Date();
+    const codigoFolio =
+      existingCert?.codigoFolio ||
+      calibracion.codigoFolio ||
+      `FOLIO-${calibracion._id}`;
+
+    const hashFirma = this.computeSignatureHash(calibracion, firmante, fechaFirma);
+
+    // Sellar la calibración para impedir modificaciones posteriores (HU-12)
+    calibracion.bloqueadoInmutable = true;
+    await calibracion.save();
+
+    if (this.certificadoModel) {
+      if (existingCert) {
+        existingCert.firmaDigital = { firmante, cargo, fechaFirma, hashFirma };
+        if (!existingCert.sellosAplicados.includes('ConFirmaDigital')) {
+          existingCert.sellosAplicados.push('ConFirmaDigital');
+        }
+        await existingCert.save();
+      } else {
+        const newCert = new this.certificadoModel({
+          codigoFolio,
+          instrumento: calibracion.instrumento,
+          calibracion: calibracion._id,
+          emitidoPor: userId,
+          fechaEmision: calibracion.fechaCalibracion,
+          fechaVencimiento: calibracion.fechaProximaCalibracion,
+          estado:
+            calibracion.resultado === ResultadoCalibracion.CONFORME
+              ? EstadoCertificado.VALIDO
+              : EstadoCertificado.ANULADO,
+          firmaDigital: { firmante, cargo, fechaFirma, hashFirma },
+          sellosAplicados: ['ConFirmaDigital'],
+          pdfUrl: `/api/calibraciones/${calibracion._id}/pdf`,
+        });
+        await newCert.save();
+      }
+    }
+
+    await this.auditService.logEvent({
+      userId,
+      userRole: cargo,
+      actionType: TipoAccionAuditoria.GENERATE_CERT,
+      entityAffected: EntidadAfectada.CERTIFICADO,
+      identifier: calibracion.numeroCertificado,
+      newState: {
+        firmante,
+        cargo,
+        fechaFirma,
+        hashFirma,
+        bloqueadoInmutable: true,
+      },
+      ipAddress,
+      userAgent,
+      descripcion: `Firma electrónica aplicada al certificado [${calibracion.numeroCertificado}] por [${firmante}].`,
+    });
+
+    return {
+      calibracionId: calibracion._id.toString(),
+      numeroCertificado: calibracion.numeroCertificado,
+      codigoFolio,
+      firmado: true,
+      firmante,
+      cargo,
+      fechaFirma,
+      hashFirma,
+      bloqueadoInmutable: true,
+    };
+  }
+
+  /**
+   * HU-12 / CP-12.4: Verifica el estado e integridad de la firma electrónica de un certificado.
+   */
+  async verificarFirma(idOrNumCertificado: string): Promise<{
+    calibracionId: string;
+    numeroCertificado: string;
+    firmado: boolean;
+    valida: boolean;
+    firmante?: string;
+    cargo?: string;
+    fechaFirma?: Date;
+    hashFirma?: string;
+    bloqueadoInmutable: boolean;
+    mensaje: string;
+  }> {
+    const calibracion = await this.findCalibracionByIdOrNumero(idOrNumCertificado);
+    if (!calibracion) {
+      throw new NotFoundException(
+        `Certificado de calibración '${idOrNumCertificado}' no encontrado.`,
+      );
+    }
+
+    const certDoc = this.certificadoModel
+      ? await this.certificadoModel.findOne({ calibracion: String(calibracion._id) }).exec()
+      : null;
+
+    if (!certDoc?.firmaDigital?.hashFirma) {
+      return {
+        calibracionId: calibracion._id.toString(),
+        numeroCertificado: calibracion.numeroCertificado,
+        firmado: false,
+        valida: false,
+        bloqueadoInmutable: Boolean(calibracion.bloqueadoInmutable),
+        mensaje: 'El certificado aún no cuenta con firma electrónica registrada.',
+      };
+    }
+
+    const expectedHash = this.computeSignatureHash(
+      calibracion,
+      certDoc.firmaDigital.firmante,
+      new Date(certDoc.firmaDigital.fechaFirma),
+    );
+    const receivedBuf = Buffer.from(certDoc.firmaDigital.hashFirma);
+    const expectedBuf = Buffer.from(expectedHash);
+    const valida =
+      receivedBuf.length === expectedBuf.length &&
+      timingSafeEqual(receivedBuf, expectedBuf) &&
+      !calibracion.anulado;
+
+    return {
+      calibracionId: calibracion._id.toString(),
+      numeroCertificado: calibracion.numeroCertificado,
+      firmado: true,
+      valida,
+      firmante: certDoc.firmaDigital.firmante,
+      cargo: certDoc.firmaDigital.cargo,
+      fechaFirma: certDoc.firmaDigital.fechaFirma,
+      hashFirma: certDoc.firmaDigital.hashFirma,
+      bloqueadoInmutable: Boolean(calibracion.bloqueadoInmutable),
+      mensaje: valida
+        ? 'Firma electrónica válida e íntegra.'
+        : 'La firma electrónica no es válida o el certificado fue alterado/anulado.',
+    };
+  }
+
+  private async findCalibracionByIdOrNumero(
+    idOrNumCertificado: string,
+  ): Promise<CalibracionDocument | null> {
+    if (isValidObjectId(idOrNumCertificado)) {
+      const byId = await this.calibracionModel.findById(idOrNumCertificado).exec();
+      if (byId) return byId;
+    }
+    return this.calibracionModel
+      .findOne({
+        $or: [
+          { numeroCertificado: idOrNumCertificado },
+          { codigoFolio: idOrNumCertificado },
+        ],
+      })
+      .exec();
+  }
+
+  private computeSignatureHash(
+    calibracion: CalibracionDocument,
+    firmante: string,
+    fechaFirma: Date,
+  ): string {
+    const secret = getQrSigningSecret();
+    const payload = [
+      calibracion.numeroCertificado,
+      String(calibracion.instrumento),
+      new Date(calibracion.fechaCalibracion).toISOString(),
+      new Date(calibracion.fechaProximaCalibracion).toISOString(),
+      calibracion.resultado,
+      firmante,
+      fechaFirma.toISOString(),
+    ].join('|');
+
+    return createHmac('sha256', secret).update(payload).digest('hex');
   }
 }

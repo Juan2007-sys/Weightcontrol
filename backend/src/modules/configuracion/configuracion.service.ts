@@ -10,6 +10,7 @@ import {
 import { AuditService } from '../audit/audit.service.js';
 
 export const CLAVE_UMBRAL_ALERTA = 'umbralAlertaDias';
+export const CLAVE_DESTINATARIOS_EMAIL = 'destinatariosNotificacionEmail';
 export const UMBRAL_ALERTA_POR_DEFECTO = 30;
 export const UMBRAL_ALERTA_MIN = 1;
 export const UMBRAL_ALERTA_MAX = 365;
@@ -88,5 +89,57 @@ export class ConfiguracionService implements OnModuleInit {
       descripcion: `Umbral de alerta por vencimiento cambiado de ${anterior} a ${umbralDias} días`,
     });
     return { umbralDias };
+  }
+
+  /** HU-14: Obtiene la lista de destinatarios configurados para notificaciones por correo. */
+  async getDestinatariosEmail(): Promise<string[]> {
+    const doc = await this.configModel
+      .findOne({ clave: CLAVE_DESTINATARIOS_EMAIL })
+      .lean()
+      .exec();
+    const raw = (doc as { valor?: unknown } | null)?.valor;
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((e) => String(e).trim().toLowerCase())
+      .filter((e) => e.length > 0);
+  }
+
+  /** HU-14: Configura los destinatarios de notificaciones automáticas por correo electrónico. */
+  async setDestinatariosEmail(
+    destinatarios: string[],
+    userId: string,
+    ipAddress?: string,
+    userAgent?: string,
+  ): Promise<{ destinatarios: string[] }> {
+    const normalizados = Array.from(
+      new Set(
+        destinatarios
+          .map((e) => e.trim().toLowerCase())
+          .filter((e) => e.length > 0),
+      ),
+    );
+    const anterior = await this.getDestinatariosEmail();
+
+    await this.configModel
+      .findOneAndUpdate(
+        { clave: CLAVE_DESTINATARIOS_EMAIL },
+        { $set: { valor: normalizados, actualizadoPor: userId } },
+        { upsert: true, new: true },
+      )
+      .exec();
+
+    await this.auditService.logEvent({
+      userId,
+      actionType: TipoAccionAuditoria.UPDATE,
+      entityAffected: EntidadAfectada.CONFIGURACION,
+      identifier: CLAVE_DESTINATARIOS_EMAIL,
+      previousState: { destinatarios: anterior },
+      newState: { destinatarios: normalizados },
+      ipAddress,
+      userAgent,
+      descripcion: `Destinatarios de correo actualizados (${normalizados.length} configurados)`,
+    });
+
+    return { destinatarios: normalizados };
   }
 }

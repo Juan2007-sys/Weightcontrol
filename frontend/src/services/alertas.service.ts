@@ -46,4 +46,20 @@ export const alertasService = {
   markAllAsRead: async (): Promise<{ modifiedCount: number }> => {
     return apiClient.patch<{ modifiedCount: number }>('/alertas/read-all');
   },
+
+  getHistorialNotificaciones: async (limit = 50): Promise<
+    Array<{
+      _id?: string;
+      evento: string;
+      serial: string;
+      fechaEvento: string;
+      destinatarios: string[];
+      asunto: string;
+      estadoEnvio: 'ENVIADO' | 'ERROR';
+      errorMensaje?: string;
+      createdAt: string;
+    }>
+  > => {
+    return apiClient.get('/alertas/notificaciones/historial', { limit });
+  },
 };

@@ -16,13 +16,16 @@ import type { UserItem, CreateUserData, UpdateUserData } from '../../services/us
 import { auditService } from '../../services/audit.service';
 import type { AuditEventItem } from '../../services/audit.service';
 import { configuracionService } from '../../services/configuracion.service';
+import { alertasService } from '../../services/alertas.service';
 import { useAuth } from '../../context/AuthContext';
+import { IndicadoresPanel } from './IndicadoresPanel';
+import { IntegracionesPanel } from './IntegracionesPanel';
 
 export const AdminSettingsView: React.FC = () => {
   const { user: currentUser } = useAuth();
   // AUDITOR y SIC: solo lectura de la trazabilidad (sin usuarios ni parámetros). El backend responde 403 en lo demás.
   const isAdmin = currentUser?.rol === 'ADMIN';
-  const [activeTab, setActiveTab] = useState<'usuarios' | 'trazabilidad' | 'parametros'>(
+  const [activeTab, setActiveTab] = useState<'usuarios' | 'trazabilidad' | 'parametros' | 'indicadores' | 'integraciones'>(
     currentUser?.rol === 'ADMIN' ? 'usuarios' : 'trazabilidad'
   );
 
@@ -73,6 +76,9 @@ export const AdminSettingsView: React.FC = () => {
   // Parámetros Maestros
   const [thresholdDays, setThresholdDays] = useState('30');
   const [savingParams, setSavingParams] = useState(false);
+  const [emailRecipientsText, setEmailRecipientsText] = useState('');
+  const [savingEmails, setSavingEmails] = useState(false);
+  const [emailHistory, setEmailHistory] = useState<any[]>([]);
   const [periodicityMonths, setPeriodicityMonths] = useState('12');
   const [empToleranceClass, setEmpToleranceClass] = useState('Clase III');
   const timeServer = 'time.nist.gov (NIST UTC-5)';
@@ -87,9 +93,7 @@ export const AdminSettingsView: React.FC = () => {
         rol: roleFilter || undefined,
         activo: statusFilter !== '' ? statusFilter === 'true' : undefined,
       });
-      if (res && res.items && res.items.length > 0) {
-        setUsers(res.items);
-      }
+      setUsers(Array.isArray(res?.items) ? res.items : []);
     } catch {
       // Fallback local
     } finally {
@@ -204,16 +208,63 @@ export const AdminSettingsView: React.FC = () => {
     }
   };
 
-  // M3: el umbral se guarda en base de datos y aplica en el siguiente escaneo, sin redesplegar.
+  // Eliminar usuario (HU-11 / CP-11.5: el backend bloquea si tiene operaciones registradas)
+  const handleDeleteUser = async (user: UserItem) => {
+    if (currentUser?.id === user.id) {
+      toast.error('No puede eliminar su propia cuenta de administrador.');
+      return;
+    }
+
+    if (!window.confirm(`¿Está seguro de eliminar permanentemente al usuario "${user.nombre}" (${user.email})?`)) {
+      return;
+    }
+
+    try {
+      await usuariosService.delete(user.id);
+      toast.success(`Usuario ${user.nombre} eliminado exitosamente.`);
+      setUsers((prev) => prev.filter((u) => u.id !== user.id));
+    } catch (err: any) {
+      toast.error(
+        err?.message ||
+          'No se pudo eliminar el usuario. Si tiene operaciones registradas, se recomienda inactivar la cuenta.'
+      );
+    }
+  };
+
+  // M3 + HU-14: el umbral y destinatarios se guardan en base de datos
   useEffect(() => {
     if (!isAdmin) return;
     configuracionService
       .getUmbralAlerta()
       .then((d) => setThresholdDays(String(d)))
-      .catch(() => {
-        /* se conserva el valor por defecto en pantalla */
-      });
+      .catch(() => {});
+    configuracionService
+      .getDestinatariosEmail()
+      .then((list) => setEmailRecipientsText(list.join(', ')))
+      .catch(() => {});
+    alertasService
+      .getHistorialNotificaciones(25)
+      .then((hist) => setEmailHistory(Array.isArray(hist) ? hist : []))
+      .catch(() => {});
   }, [isAdmin]);
+
+  const handleSaveEmailRecipients = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const list = emailRecipientsText
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    setSavingEmails(true);
+    try {
+      const saved = await configuracionService.setDestinatariosEmail(list);
+      setEmailRecipientsText(saved.join(', '));
+      toast.success(`Destinatarios actualizados (${saved.length}).`);
+    } catch (err: any) {
+      toast.error(err?.message || 'No se pudieron guardar los destinatarios.');
+    } finally {
+      setSavingEmails(false);
+    }
+  };
 
   const handleSaveParams = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -387,7 +438,56 @@ export const AdminSettingsView: React.FC = () => {
               <span>3. Parámetros Maestros y Criptografía</span>
             </button>
           )}
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('indicadores')}
+            style={{
+              padding: '10px 20px',
+              fontWeight: 700,
+              fontSize: '13px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              cursor: 'pointer',
+              color: activeTab === 'indicadores' ? 'var(--navy-900)' : 'var(--text-muted)',
+              borderBottom: activeTab === 'indicadores' ? '3px solid var(--blue-600)' : '3px solid transparent',
+              marginBottom: '-2px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <ActivityIcon size={16} />
+            <span>4. Panel de Indicadores</span>
+          </button>
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setActiveTab('integraciones')}
+              style={{
+                padding: '10px 20px',
+                fontWeight: 700,
+                fontSize: '13px',
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+                color: activeTab === 'integraciones' ? 'var(--navy-900)' : 'var(--text-muted)',
+                borderBottom: activeTab === 'integraciones' ? '3px solid var(--blue-600)' : '3px solid transparent',
+                marginBottom: '-2px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+              }}
+            >
+              <ShieldAlertIcon size={16} />
+              <span>5. Integraciones Externas</span>
+            </button>
+          )}
         </div>
+
+        {activeTab === 'indicadores' && <IndicadoresPanel />}
+        {isAdmin && activeTab === 'integraciones' && <IntegracionesPanel />}
 
         {/* PESTAÑA 1: GESTIÓN DE USUARIOS */}
         {isAdmin && activeTab === 'usuarios' && (
@@ -649,6 +749,28 @@ export const AdminSettingsView: React.FC = () => {
                                 >
                                   {u.activo ? 'Inactivar' : 'Activar'}
                                 </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteUser(u)}
+                                  disabled={currentUser?.id === u.id}
+                                  className="btn-gov-compact"
+                                  style={{
+                                    fontSize: '11px',
+                                    height: '28px',
+                                    borderColor: '#DC2626',
+                                    color: '#991B1B',
+                                    backgroundColor: '#FFFFFF',
+                                    opacity: currentUser?.id === u.id ? 0.5 : 1,
+                                  }}
+                                  title={
+                                    currentUser?.id === u.id
+                                      ? 'No puede eliminar su propia cuenta'
+                                      : 'Eliminar usuario (solo si no tiene operaciones registradas)'
+                                  }
+                                >
+                                  Eliminar
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -873,6 +995,70 @@ export const AdminSettingsView: React.FC = () => {
                   </ul>
                 </div>
               </div>
+            </div>
+
+            {/* HU-14: Destinatarios e Historial de Notificaciones por Correo */}
+            <div className="gov-card" style={{ padding: '24px', backgroundColor: '#FFFFFF', gridColumn: '1 / -1' }}>
+              <div className="microlabel" style={{ color: 'var(--navy-900)', marginBottom: '16px', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
+                3. NOTIFICACIONES AUTOMÁTICAS POR CORREO ELECTRÓNICO (HU-14)
+              </div>
+
+              <form onSubmit={handleSaveEmailRecipients} style={{ display: 'flex', gap: '12px', alignItems: 'end', marginBottom: '20px', flexWrap: 'wrap' }}>
+                <div style={{ flex: 1, minWidth: '260px' }}>
+                  <label htmlFor="adm-emails" className="microlabel" style={{ display: 'block', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                    DESTINATARIOS CONFIGURADOS (SEPARADOS POR COMA)
+                  </label>
+                  <input
+                    id="adm-emails"
+                    type="text"
+                    value={emailRecipientsText}
+                    onChange={(e) => setEmailRecipientsText(e.target.value)}
+                    placeholder="metrologia@empresa.co, calidad@empresa.co"
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 'var(--radius-input)', border: '1px solid var(--border-strong)' }}
+                  />
+                </div>
+                <button type="submit" className="btn-gov-primary" disabled={savingEmails} style={{ height: '38px' }}>
+                  {savingEmails ? 'Guardando...' : 'Guardar Destinatarios'}
+                </button>
+              </form>
+
+              <div style={{ fontSize: '12px', fontWeight: 700, marginBottom: '8px' }}>
+                Historial de Notificaciones Enviadas ({emailHistory.length})
+              </div>
+              <table className="gov-table" style={{ width: '100%' }}>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Evento</th>
+                    <th>Serial</th>
+                    <th>Destinatarios</th>
+                    <th>Estado</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {emailHistory.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} style={{ textAlign: 'center', color: '#64748B' }}>
+                        Sin notificaciones registradas aún.
+                      </td>
+                    </tr>
+                  ) : (
+                    emailHistory.map((item, idx) => (
+                      <tr key={item._id || idx}>
+                        <td style={{ fontSize: '11px' }}>{new Date(item.createdAt).toLocaleString()}</td>
+                        <td>{item.evento}</td>
+                        <td className="font-mono">{item.serial}</td>
+                        <td style={{ fontSize: '11px' }}>{(item.destinatarios || []).join(', ')}</td>
+                        <td>
+                          <span style={{ fontWeight: 700, color: item.estadoEnvio === 'ENVIADO' ? '#047857' : '#DC2626' }}>
+                            {item.estadoEnvio}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

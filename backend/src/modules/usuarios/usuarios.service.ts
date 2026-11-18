@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
@@ -11,6 +12,14 @@ import * as bcrypt from 'bcrypt';
 import {
   Usuario,
   UsuarioDocument,
+  Instrumento,
+  InstrumentoDocument,
+  Calibracion,
+  CalibracionDocument,
+  Certificado,
+  CertificadoDocument,
+  TrazabilidadEvento,
+  TrazabilidadEventoDocument,
   TipoAccionAuditoria,
   EntidadAfectada,
 } from '../../schemas/index.js';
@@ -29,6 +38,18 @@ export class UsuariosService {
     @InjectModel(Usuario.name)
     private readonly usuarioModel: Model<UsuarioDocument>,
     private readonly auditService: AuditService,
+    @Optional()
+    @InjectModel(Instrumento.name)
+    private readonly instrumentoModel?: Model<InstrumentoDocument>,
+    @Optional()
+    @InjectModel(Calibracion.name)
+    private readonly calibracionModel?: Model<CalibracionDocument>,
+    @Optional()
+    @InjectModel(Certificado.name)
+    private readonly certificadoModel?: Model<CertificadoDocument>,
+    @Optional()
+    @InjectModel(TrazabilidadEvento.name)
+    private readonly trazabilidadModel?: Model<TrazabilidadEventoDocument>,
   ) {}
 
   async create(
@@ -287,6 +308,13 @@ export class UsuariosService {
       );
     }
 
+    // HU-11 / CP-11.5: No permitir eliminar usuarios con operaciones registradas
+    if (await this.hasRegisteredOperations(id)) {
+      throw new ConflictException(
+        'No es posible eliminar el usuario porque tiene operaciones registradas en el sistema. Se recomienda inactivar la cuenta para conservar la trazabilidad.',
+      );
+    }
+
     await this.usuarioModel.findByIdAndDelete(id).exec();
 
     await this.auditService.logEvent({
@@ -309,6 +337,29 @@ export class UsuariosService {
       message: `Usuario '${user.email}' eliminado exitosamente.`,
       id,
     };
+  }
+
+  /** Verifica si el usuario tiene operaciones registradas en instrumentos, calibraciones, certificados o auditoría. */
+  private async hasRegisteredOperations(userId: string): Promise<boolean> {
+    const [hasInstrumento, hasCalibracion, hasCertificado, hasAuditoria] =
+      await Promise.all([
+        this.instrumentoModel?.exists({
+          $or: [
+            { creadoPor: userId },
+            { actualizadoPor: userId },
+            { inactivadoPor: userId },
+          ],
+        }),
+        this.calibracionModel?.exists({
+          $or: [{ tecnico: userId }, { anuladoPor: userId }],
+        }),
+        this.certificadoModel?.exists({ emitidoPor: userId }),
+        this.trazabilidadModel?.exists({ userId }),
+      ]);
+
+    return Boolean(
+      hasInstrumento || hasCalibracion || hasCertificado || hasAuditoria,
+    );
   }
 
   private sanitize(user: UsuarioDocument): UsuarioResponseDto {

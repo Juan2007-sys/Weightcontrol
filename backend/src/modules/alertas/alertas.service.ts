@@ -16,10 +16,15 @@ import {
   EstadoInstrumento,
   TipoAccionAuditoria,
   EntidadAfectada,
+  NotificacionEmail,
+  NotificacionEmailDocument,
+  TipoEventoNotificacion,
+  EstadoEnvioNotificacion,
 } from '../../schemas/index.js';
 import { AuditService } from '../audit/audit.service.js';
 import { ConfiguracionService } from '../configuracion/configuracion.service.js';
 import { NotificadorEngineService } from './notificador-engine.service.js';
+import { EmailNotificadorStrategy } from './strategies/email-notificador.strategy.js';
 import { QueryAlertasDto } from './dto/query-alertas.dto.js';
 import { AlertaResponseDto } from './dto/alerta-response.dto.js';
 import { AlertasStatsDto } from './dto/alertas-stats.dto.js';
@@ -38,6 +43,11 @@ export class AlertasService {
     private readonly auditService: AuditService,
     @Optional()
     private readonly configuracionService?: ConfiguracionService,
+    @Optional()
+    @InjectModel(NotificacionEmail.name)
+    private readonly notificacionEmailModel?: Model<NotificacionEmailDocument>,
+    @Optional()
+    private readonly emailStrategy?: EmailNotificadorStrategy,
   ) {}
 
   @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT)
@@ -137,6 +147,21 @@ export class AlertasService {
             diasRestantes,
             nivelCriticidad,
             mensaje,
+          });
+
+          // HU-14: Registro, deduplicación por evento/periodo y trazabilidad de correo
+          const eventoEmail =
+            nivelCriticidad === NivelAlerta.VENCIDA
+              ? TipoEventoNotificacion.CALIBRACION_VENCIDA
+              : TipoEventoNotificacion.PROXIMO_VENCIMIENTO;
+          const periodoKey = `${nivelCriticidad}|${fechaProx.toISOString().split('T')[0]}`;
+          await this.notificarEventoCorreo({
+            evento: eventoEmail,
+            serial: inst.serial,
+            fechaEvento: fechaProx,
+            asunto: `[WeightControl - ${nivelCriticidad}] Calibración de ${inst.serial}`,
+            mensaje,
+            clavePeriodo: periodoKey,
           });
 
           const nuevaAlerta = new this.alertaModel({
@@ -326,5 +351,138 @@ export class AlertasService {
       createdAt: (doc as any).createdAt,
       updatedAt: (doc as any).updatedAt,
     };
+  }
+
+  /**
+   * HU-14: Envía notificación por correo evitando duplicados por evento y periodo,
+   * registrando el estado (ENVIADO / ERROR) en el historial.
+   */
+  async notificarEventoCorreo(params: {
+    evento: TipoEventoNotificacion;
+    serial: string;
+    fechaEvento: Date;
+    asunto: string;
+    mensaje: string;
+    clavePeriodo: string;
+  }): Promise<{
+    sent: boolean;
+    deduplicated: boolean;
+    estadoEnvio: EstadoEnvioNotificacion;
+    errorMensaje?: string;
+  }> {
+    const serialNorm = params.serial.trim().toUpperCase();
+    const claveDeduplicacion = `${params.evento}|${serialNorm}|${params.clavePeriodo}`;
+
+    if (this.notificacionEmailModel) {
+      const yaEnviada = await this.notificacionEmailModel
+        .findOne({
+          claveDeduplicacion,
+          estadoEnvio: EstadoEnvioNotificacion.ENVIADO,
+        })
+        .lean()
+        .exec();
+
+      if (yaEnviada) {
+        return {
+          sent: false,
+          deduplicated: true,
+          estadoEnvio: EstadoEnvioNotificacion.ENVIADO,
+        };
+      }
+    }
+
+    const configurados =
+      (await this.configuracionService?.getDestinatariosEmail()) ?? [];
+    const destinatarios =
+      configurados.length > 0
+        ? configurados
+        : ['responsable.metrologia@empresa.com'];
+
+    const fechaStr = new Date(params.fechaEvento).toISOString().split('T')[0];
+    const cuerpo = `${params.mensaje} | Serial: ${serialNorm} | Fecha del evento: ${fechaStr}`;
+
+    let estadoEnvio = EstadoEnvioNotificacion.ENVIADO;
+    let errorMensaje: string | undefined;
+
+    try {
+      const strategy = this.emailStrategy ?? new EmailNotificadorStrategy();
+      await strategy.sendDirectEmail({
+        to: destinatarios,
+        subject: params.asunto,
+        text: cuerpo,
+      });
+    } catch (err) {
+      estadoEnvio = EstadoEnvioNotificacion.ERROR;
+      errorMensaje = (err as Error).message || 'Error desconocido al enviar correo';
+      this.logger.error(
+        `HU-14: Fallo al enviar correo [${claveDeduplicacion}]: ${errorMensaje}`,
+      );
+      await this.auditService
+        .logEvent({
+          userRole: 'SYSTEM',
+          actionType: TipoAccionAuditoria.UPDATE,
+          entityAffected: EntidadAfectada.INSTRUMENTO,
+          identifier: serialNorm,
+          newState: { evento: params.evento, estadoEnvio, errorMensaje },
+          descripcion: `Error al enviar notificación por correo para [${serialNorm}]: ${errorMensaje}`,
+        })
+        .catch(() => {});
+    }
+
+    if (this.notificacionEmailModel) {
+      await this.notificacionEmailModel
+        .findOneAndUpdate(
+          { claveDeduplicacion },
+          {
+            $set: {
+              evento: params.evento,
+              claveDeduplicacion,
+              serial: serialNorm,
+              fechaEvento: params.fechaEvento,
+              destinatarios,
+              asunto: params.asunto,
+              estadoEnvio,
+              errorMensaje,
+            },
+          },
+          { upsert: true, new: true },
+        )
+        .exec();
+    }
+
+    return {
+      sent: estadoEnvio === EstadoEnvioNotificacion.ENVIADO,
+      deduplicated: false,
+      estadoEnvio,
+      errorMensaje,
+    };
+  }
+
+  /** HU-14 / CP-14.4: Notifica por correo cuando se emite un nuevo certificado. */
+  async notificarNuevoCertificado(
+    serial: string,
+    numeroCertificado: string,
+    fechaEmision: Date,
+  ) {
+    return this.notificarEventoCorreo({
+      evento: TipoEventoNotificacion.NUEVO_CERTIFICADO,
+      serial,
+      fechaEvento: fechaEmision,
+      asunto: `[WeightControl] Nuevo certificado emitido ${numeroCertificado} (${serial})`,
+      mensaje: `Se ha generado el certificado de calibración ${numeroCertificado}.`,
+      clavePeriodo: numeroCertificado,
+    });
+  }
+
+  /** HU-14: Consulta el historial de notificaciones por correo enviadas o fallidas. */
+  async getHistorialNotificaciones(limit = 50) {
+    if (!this.notificacionEmailModel) return [];
+    const safeLimit = Math.max(1, Math.min(200, Number(limit) || 50));
+    return this.notificacionEmailModel
+      .find()
+      .sort({ createdAt: -1 })
+      .limit(safeLimit)
+      .lean()
+      .exec();
   }
 }

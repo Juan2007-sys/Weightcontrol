@@ -5,3 +5,6 @@ export * from './certificado.schema.js';
 export * from './trazabilidad-evento.schema.js';
 export * from './alerta.schema.js';
 export * from './configuracion.schema.js';
+export * from './notificacion-email.schema.js';
+export * from './conexion-externa.schema.js';
+export * from './sync-log.schema.js';

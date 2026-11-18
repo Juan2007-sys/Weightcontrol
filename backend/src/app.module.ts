@@ -12,6 +12,8 @@ import { CalibracionesModule } from './modules/calibraciones/calibraciones.modul
 import { AlertasModule } from './modules/alertas/alertas.module.js';
 import { ConfiguracionModule } from './modules/configuracion/configuracion.module.js';
 import { UsuariosModule } from './modules/usuarios/usuarios.module.js';
+import { IndicadoresModule } from './modules/indicadores/indicadores.module.js';
+import { IntegracionesModule } from './modules/integraciones/integraciones.module.js';
 
 @Module({
   imports: [
@@ -37,6 +39,8 @@ import { UsuariosModule } from './modules/usuarios/usuarios.module.js';
     CalibracionesModule,
     AlertasModule,
     ConfiguracionModule,
+    IndicadoresModule,
+    IntegracionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

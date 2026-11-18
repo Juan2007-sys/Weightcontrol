@@ -16,6 +16,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { calibracionesService } from '../../services/calibraciones.service';
 import { toast } from 'sonner';
 import { useDialogA11y } from '../../utils/useDialogA11y';
+import { useAuth } from '../../context/AuthContext';
 
 export interface PdfViewerMetadata {
   /** Número del certificado (folio). Si falta, se usa certIdOrFolio. */
@@ -53,6 +54,19 @@ export const PdfCertificateViewerModal: React.FC<PdfCertificateViewerModalProps>
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copiedHash, setCopiedHash] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const { user } = useAuth();
+  const [firmaInfo, setFirmaInfo] = useState<{
+    firmado: boolean;
+    valida: boolean;
+    firmante?: string;
+    fechaFirma?: string;
+  } | null>(null);
+  const [signing, setSigning] = useState(false);
+
+  const canSign =
+    user?.rol === 'ADMIN' ||
+    user?.rol === 'TECNICO' ||
+    user?.rol === 'INSTITUCION_ACREDITACION';
 
   useEffect(() => {
     if (!isOpen || !certIdOrFolio) return;
@@ -76,6 +90,15 @@ export const PdfCertificateViewerModal: React.FC<PdfCertificateViewerModalProps>
     };
 
     loadPdf();
+
+    if (user) {
+      calibracionesService
+        .verificarFirma(certIdOrFolio)
+        .then((res) => setFirmaInfo(res))
+        .catch(() => setFirmaInfo(null));
+    } else {
+      setFirmaInfo(null);
+    }
 
     return () => {
       if (activeUrl) {
@@ -225,8 +248,60 @@ export const PdfCertificateViewerModal: React.FC<PdfCertificateViewerModalProps>
               </div>
             </div>
 
-            {/* Botones de Acción: Imprimir, Descargar, Pantalla Completa, Cerrar */}
+            {/* Botones de Acción: Firmar, Imprimir, Descargar, Pantalla Completa, Cerrar */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              {firmaInfo?.firmado ? (
+                <span
+                  style={{
+                    fontSize: '11px',
+                    fontWeight: 700,
+                    padding: '4px 8px',
+                    borderRadius: '4px',
+                    backgroundColor: firmaInfo.valida ? '#065F46' : '#991B1B',
+                    color: '#FFFFFF',
+                  }}
+                >
+                  {firmaInfo.valida
+                    ? `Firmado: ${firmaInfo.firmante}`
+                    : 'Firma inválida'}
+                </span>
+              ) : (
+                canSign && (
+                  <button
+                    type="button"
+                    disabled={signing}
+                    onClick={async () => {
+                      setSigning(true);
+                      try {
+                        const res = await calibracionesService.firmarCertificado(certIdOrFolio);
+                        setFirmaInfo({
+                          firmado: true,
+                          valida: true,
+                          firmante: res.firmante,
+                          fechaFirma: res.fechaFirma,
+                        });
+                        toast.success(`Certificado firmado por ${res.firmante}`);
+                      } catch (err: any) {
+                        toast.error(err?.message || 'No se pudo firmar el certificado.');
+                      } finally {
+                        setSigning(false);
+                      }
+                    }}
+                    style={{
+                      padding: '5px 10px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      borderRadius: '4px',
+                      border: '1px solid #FCD116',
+                      backgroundColor: '#1E3A8A',
+                      color: '#FCD116',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {signing ? 'Firmando...' : 'Firmar Electrónicamente'}
+                  </button>
+                )
+              )}
               <button
                 type="button"
                 onClick={handlePrint}

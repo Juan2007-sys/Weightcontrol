@@ -39,6 +39,12 @@ export class AlertasController {
     return this.alertasService.getStats();
   }
 
+  @Get('notificaciones/historial')
+  @Roles(RolUsuario.ADMIN, RolUsuario.AUDITOR, RolUsuario.SIC)
+  async getHistorialNotificaciones(@Query('limit') limit?: number) {
+    return this.alertasService.getHistorialNotificaciones(limit);
+  }
+
   @Post('scan')
   @Roles(RolUsuario.ADMIN, RolUsuario.TECNICO, RolUsuario.INSTITUCION_ACREDITACION)
   @HttpCode(HttpStatus.OK)

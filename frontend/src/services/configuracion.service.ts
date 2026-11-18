@@ -11,4 +11,16 @@ export const configuracionService = {
     const r = await apiClient.put<{ umbralDias: number }>('/configuracion/alertas', { umbralDias });
     return r.umbralDias;
   },
+
+  getDestinatariosEmail: async (): Promise<string[]> => {
+    const r = await apiClient.get<{ destinatarios: string[] }>('/configuracion/notificaciones/destinatarios');
+    return r.destinatarios ?? [];
+  },
+
+  setDestinatariosEmail: async (destinatarios: string[]): Promise<string[]> => {
+    const r = await apiClient.put<{ destinatarios: string[] }>('/configuracion/notificaciones/destinatarios', {
+      destinatarios,
+    });
+    return r.destinatarios ?? [];
+  },
 };

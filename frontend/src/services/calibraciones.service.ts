@@ -102,4 +102,33 @@ export const calibracionesService = {
     document.body.removeChild(link);
     window.URL.revokeObjectURL(blobUrl);
   },
+
+  firmarCertificado: async (idOrFolio: string): Promise<{
+    calibracionId: string;
+    numeroCertificado: string;
+    codigoFolio: string;
+    firmado: boolean;
+    firmante: string;
+    cargo: string;
+    fechaFirma: string;
+    hashFirma: string;
+    bloqueadoInmutable: boolean;
+  }> => {
+    return apiClient.post(`/calibraciones/${idOrFolio}/firmar`, {});
+  },
+
+  verificarFirma: async (idOrFolio: string): Promise<{
+    calibracionId: string;
+    numeroCertificado: string;
+    firmado: boolean;
+    valida: boolean;
+    firmante?: string;
+    cargo?: string;
+    fechaFirma?: string;
+    hashFirma?: string;
+    bloqueadoInmutable: boolean;
+    mensaje: string;
+  }> => {
+    return apiClient.get(`/calibraciones/${idOrFolio}/firma`);
+  },
 };

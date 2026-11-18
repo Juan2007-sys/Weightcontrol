@@ -106,6 +106,23 @@ export class CalibracionesController {
     res.end(pdfBuffer);
   }
 
+  @Get(':id/firma')
+  async verificarFirma(@Param('id') id: string) {
+    return this.calibracionesService.verificarFirma(id);
+  }
+
+  @Post(':id/firmar')
+  @Roles(RolUsuario.ADMIN, RolUsuario.TECNICO, RolUsuario.INSTITUCION_ACREDITACION)
+  async firmarCertificado(
+    @Param('id') id: string,
+    @CurrentUser('id') userId: string,
+    @Req() req: Request,
+  ) {
+    const ipAddress = req.ip || req.socket.remoteAddress;
+    const userAgent = req.headers['user-agent'];
+    return this.calibracionesService.firmarCertificado(id, userId, ipAddress, userAgent);
+  }
+
   @Get(':id')
   async findById(@Param('id') id: string): Promise<CalibracionResponseDto> {
     return this.calibracionesService.findById(id);

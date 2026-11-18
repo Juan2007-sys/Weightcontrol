@@ -15,6 +15,12 @@ import {
   AlertaSchema,
   Configuracion,
   ConfiguracionSchema,
+  NotificacionEmail,
+  NotificacionEmailSchema,
+  ConexionExterna,
+  ConexionExternaSchema,
+  SyncLog,
+  SyncLogSchema,
 } from '../schemas/index.js';
 
 @Module({
@@ -27,6 +33,9 @@ import {
       { name: TrazabilidadEvento.name, schema: TrazabilidadEventoSchema },
       { name: Alerta.name, schema: AlertaSchema },
       { name: Configuracion.name, schema: ConfiguracionSchema },
+      { name: NotificacionEmail.name, schema: NotificacionEmailSchema },
+      { name: ConexionExterna.name, schema: ConexionExternaSchema },
+      { name: SyncLog.name, schema: SyncLogSchema },
     ]),
   ],
   exports: [MongooseModule],
